@@ -71,7 +71,7 @@ class App {
             if (liveStocks && liveStocks.length > 5) {
                 stocks = liveStocks;
                 this.dataSource = 'live';
-                console.log(`✅ Canlı veri: ${stocks.length} hisse yüklendi`);
+                console.log(`✅ Canlı veri (${dataFetcher.dataSource}): ${stocks.length} hisse yüklendi`);
             } else {
                 throw new Error('Insufficient live data');
             }
@@ -244,8 +244,22 @@ class App {
         document.getElementById('penny-count').textContent = this.analyzedStocks.length;
         const hotPicks = this.analyzedStocks.filter(s => s.analysis.totalScore >= 75).length;
         document.getElementById('hot-picks').textContent = hotPicks;
-        const avgScore = Math.round(this.analyzedStocks.reduce((sum, s) => sum + s.analysis.totalScore, 0) / this.analyzedStocks.length);
+        const avgScore = this.analyzedStocks.length > 0
+            ? Math.round(this.analyzedStocks.reduce((sum, s) => sum + s.analysis.totalScore, 0) / this.analyzedStocks.length)
+            : 0;
         document.getElementById('avg-score').textContent = avgScore;
+
+        // Data source indicator
+        const badge = document.getElementById('data-source-badge');
+        if (badge) {
+            if (this.dataSource === 'live') {
+                badge.innerHTML = '<i class="fas fa-signal"></i> Canli Veri';
+                badge.className = 'data-badge data-badge-live';
+            } else {
+                badge.innerHTML = '<i class="fas fa-database"></i> Statik Veri';
+                badge.className = 'data-badge data-badge-static';
+            }
+        }
 
         // Charts
         chartManager.createTopStocksChart(this.analyzedStocks);

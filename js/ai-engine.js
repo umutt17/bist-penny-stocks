@@ -1103,7 +1103,7 @@ class AIEngine {
     analyzeAll(stocks) {
         return stocks.map(stock => ({
             ...stock,
-            analysis: this.analyzeStock(stock)
+            analysis: this.analyzeStock(stock, stock._ohlcv || null)
         })).sort((a, b) => b.analysis.totalScore - a.analysis.totalScore);
     }
 

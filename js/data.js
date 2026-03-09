@@ -143,94 +143,168 @@ const NEWS_SENTIMENT = [
     { title: "Yabancı yatırımcı BIST'e geri dönüyor", sentiment: "positive", impact: "high", sector: "all" }
 ];
 
-// ===== Yahoo Finance Data Fetcher =====
+// ===== Multi-Strategy Data Fetcher =====
 class BISTDataFetcher {
     constructor() {
-        // Multiple CORS proxies as fallback
-        this.corsProxies = [
-            'https://api.allorigins.win/raw?url=',
-            'https://corsproxy.io/?',
-            'https://api.codetabs.com/v1/proxy?quest=',
-        ];
-        this.currentProxyIndex = 0;
         this.isLive = false;
+        this.dataSource = 'static';
     }
 
-    get proxy() {
-        return this.corsProxies[this.currentProxyIndex];
+    // Fetch with timeout helper
+    async fetchWithTimeout(url, timeoutMs = 5000) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response;
+        } catch (e) {
+            clearTimeout(timeoutId);
+            throw e;
+        }
     }
 
-    nextProxy() {
-        this.currentProxyIndex = (this.currentProxyIndex + 1) % this.corsProxies.length;
-    }
+    // Strategy 1: Yahoo Finance v8 chart API (per-symbol, but reliable)
+    async fetchViaYahooV8(symbol) {
+        const proxies = [
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=3mo&interval=1d`)}`,
+            `https://corsproxy.io/?${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=3mo&interval=1d`)}`,
+        ];
 
-    // Fetch multiple quotes from Yahoo Finance
-    async fetchQuotes(symbols) {
-        const symbolStr = symbols.join(',');
-        const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbolStr}&fields=symbol,shortName,longName,regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,averageDailyVolume3Month,marketCap,trailingPE,priceToBook,fiftyTwoWeekHigh,fiftyTwoWeekLow,fiftyDayAverage,twoHundredDayAverage,trailingAnnualDividendYield,beta`;
-
-        for (let attempt = 0; attempt < this.corsProxies.length; attempt++) {
+        for (const proxyUrl of proxies) {
             try {
-                const proxyUrl = this.proxy + encodeURIComponent(url);
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 4000);
-                const response = await fetch(proxyUrl, {
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-
-                if (!response.ok) {
-                    this.nextProxy();
-                    continue;
-                }
-
-                const data = await response.json();
-                if (data.quoteResponse && data.quoteResponse.result) {
-                    this.isLive = true;
-                    return data.quoteResponse.result;
-                }
-                this.nextProxy();
+                const resp = await this.fetchWithTimeout(proxyUrl, 4000);
+                const json = await resp.json();
+                const result = json?.chart?.result?.[0];
+                if (result && result.meta) return result;
             } catch (e) {
-                console.warn(`Proxy ${this.currentProxyIndex} failed:`, e.message);
-                this.nextProxy();
+                continue;
             }
         }
         return null;
     }
 
-    // Fetch market indicators (USD/TRY, BIST100, Gold, VIX)
-    async fetchMarketData() {
-        const symbols = 'USDTRY=X,EURTRY=X,XU100.IS,GC=F,^VIX';
-        try {
-            const results = await this.fetchQuotes(symbols.split(','));
-            if (!results) return;
+    // Strategy 2: Yahoo Finance v7 quote API (batch, but may need crumb)
+    async fetchViaYahooV7(symbols) {
+        const symbolStr = symbols.join(',');
+        const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbolStr}&fields=symbol,shortName,longName,regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,averageDailyVolume3Month,marketCap,trailingPE,priceToBook,fiftyTwoWeekHigh,fiftyTwoWeekLow,fiftyDayAverage,twoHundredDayAverage,trailingAnnualDividendYield,beta`;
 
-            results.forEach(q => {
-                if (q.symbol === 'USDTRY=X') {
-                    MARKET_FACTORS.usdTry.value = q.regularMarketPrice || 0;
-                    MARKET_FACTORS.usdTry.change = q.regularMarketChangePercent || 0;
-                } else if (q.symbol === 'EURTRY=X') {
-                    MARKET_FACTORS.eurTry.value = q.regularMarketPrice || 0;
-                    MARKET_FACTORS.eurTry.change = q.regularMarketChangePercent || 0;
-                } else if (q.symbol === 'XU100.IS') {
-                    MARKET_FACTORS.bist100.value = q.regularMarketPrice || 0;
-                    MARKET_FACTORS.bist100.change = q.regularMarketChangePercent || 0;
-                } else if (q.symbol === 'GC=F') {
-                    // Gold USD price * USD/TRY / 31.1 (ons to gram)
-                    const goldUsd = q.regularMarketPrice || 0;
-                    MARKET_FACTORS.goldTry.value = Math.round(goldUsd * (MARKET_FACTORS.usdTry.value || 38) / 31.1035);
-                    MARKET_FACTORS.goldTry.change = q.regularMarketChangePercent || 0;
-                } else if (q.symbol === '^VIX') {
-                    MARKET_FACTORS.vix.value = q.regularMarketPrice || 0;
-                    MARKET_FACTORS.vix.change = q.regularMarketChangePercent || 0;
+        const proxies = [
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+            `https://corsproxy.io/?${encodeURIComponent(url)}`,
+            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+        ];
+
+        for (const proxyUrl of proxies) {
+            try {
+                const resp = await this.fetchWithTimeout(proxyUrl, 5000);
+                const data = await resp.json();
+                if (data?.quoteResponse?.result?.length > 0) {
+                    return data.quoteResponse.result;
                 }
-            });
-        } catch (e) {
-            console.warn('Market data fetch failed:', e);
+            } catch (e) {
+                continue;
+            }
         }
+        return null;
     }
 
-    // Convert Yahoo Finance quote to our stock format
+    // Strategy 3: Yahoo Finance v6 quote API (alternative endpoint)
+    async fetchViaYahooV6(symbols) {
+        const symbolStr = symbols.join(',');
+        const url = `https://query2.finance.yahoo.com/v6/finance/quote?symbols=${symbolStr}`;
+
+        const proxies = [
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+            `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        ];
+
+        for (const proxyUrl of proxies) {
+            try {
+                const resp = await this.fetchWithTimeout(proxyUrl, 5000);
+                const data = await resp.json();
+                if (data?.quoteResponse?.result?.length > 0) {
+                    return data.quoteResponse.result;
+                }
+            } catch (e) {
+                continue;
+            }
+        }
+        return null;
+    }
+
+    // Convert v8 chart result to stock format
+    chartToStock(result) {
+        const meta = result.meta;
+        const symbol = (meta.symbol || '').replace('.IS', '');
+        const price = meta.regularMarketPrice || 0;
+        const quotes = result.indicators?.quote?.[0] || {};
+        const timestamps = result.timestamp || [];
+
+        // Extract OHLCV data for technical analysis
+        const ohlcv = [];
+        for (let i = 0; i < timestamps.length; i++) {
+            if (quotes.close?.[i] != null) {
+                ohlcv.push({
+                    open: quotes.open?.[i] || quotes.close[i],
+                    high: quotes.high?.[i] || quotes.close[i],
+                    low: quotes.low?.[i] || quotes.close[i],
+                    close: quotes.close[i],
+                    volume: quotes.volume?.[i] || 0
+                });
+            }
+        }
+
+        // Calculate 52-week high/low from data
+        const closes = ohlcv.map(d => d.close).filter(c => c > 0);
+        const highs = ohlcv.map(d => d.high).filter(h => h > 0);
+        const lows = ohlcv.map(d => d.low).filter(l => l > 0);
+
+        const week52High = meta.fiftyTwoWeekHigh || (highs.length > 0 ? Math.max(...highs) : price * 1.3);
+        const week52Low = meta.fiftyTwoWeekLow || (lows.length > 0 ? Math.min(...lows) : price * 0.7);
+
+        // Calculate averages from data
+        const recentVols = ohlcv.slice(-20).map(d => d.volume);
+        const avgVol = recentVols.length > 0 ? recentVols.reduce((a, b) => a + b, 0) / recentVols.length : 1;
+
+        // SMA 50 and SMA 200
+        const ma50 = closes.length >= 50
+            ? closes.slice(-50).reduce((a, b) => a + b, 0) / 50
+            : meta.fiftyDayAverage || price;
+        const ma200 = closes.length >= 200
+            ? closes.slice(-200).reduce((a, b) => a + b, 0) / 200
+            : meta.twoHundredDayAverage || price;
+
+        const prevClose = meta.chartPreviousClose || meta.previousClose || price;
+        const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
+
+        return {
+            symbol,
+            name: COMPANY_NAMES[symbol] || symbol,
+            sector: SECTOR_MAP[symbol] || 'Diğer',
+            price,
+            change: Math.round(change * 100) / 100,
+            volume: ohlcv.length > 0 ? ohlcv[ohlcv.length - 1].volume : 0,
+            marketCap: meta.marketCap || 0,
+            pe: meta.trailingPE || 0,
+            pb: meta.priceToBook || 0,
+            roe: (meta.trailingPE > 0 && meta.priceToBook > 0)
+                ? Math.round((meta.priceToBook / meta.trailingPE) * 100 * 10) / 10 : 0,
+            debt: 40,
+            beta: meta.beta || 1.2,
+            float: 55,
+            week52High,
+            week52Low,
+            avgVolume: Math.round(avgVol),
+            dividend: 0,
+            ma50: Math.round(ma50 * 100) / 100,
+            ma200: Math.round(ma200 * 100) / 100,
+            _ohlcv: ohlcv // Attach real OHLCV for AI engine!
+        };
+    }
+
+    // Convert v7 quote result to stock format
     quoteToStock(quote) {
         const symbol = quote.symbol.replace('.IS', '');
         const price = quote.regularMarketPrice || 0;
@@ -238,23 +312,22 @@ class BISTDataFetcher {
         const week52Low = quote.fiftyTwoWeekLow || price * 0.7;
 
         return {
-            symbol: symbol,
+            symbol,
             name: COMPANY_NAMES[symbol] || quote.shortName || quote.longName || symbol,
             sector: SECTOR_MAP[symbol] || 'Diğer',
-            price: price,
+            price,
             change: quote.regularMarketChangePercent || 0,
             volume: quote.regularMarketVolume || 0,
             marketCap: quote.marketCap || 0,
             pe: quote.trailingPE || 0,
             pb: quote.priceToBook || 0,
             roe: quote.trailingPE > 0 && quote.priceToBook > 0
-                ? Math.round((quote.priceToBook / quote.trailingPE) * 100 * 10) / 10
-                : 0,
-            debt: 40, // Default - not available from basic quote
+                ? Math.round((quote.priceToBook / quote.trailingPE) * 100 * 10) / 10 : 0,
+            debt: 40,
             beta: quote.beta || 1.2,
-            float: 55, // Default
-            week52High: week52High,
-            week52Low: week52Low,
+            float: 55,
+            week52High,
+            week52Low,
             avgVolume: quote.averageDailyVolume3Month || quote.regularMarketVolume || 1,
             dividend: (quote.trailingAnnualDividendYield || 0) * 100,
             ma50: quote.fiftyDayAverage || price,
@@ -262,35 +335,132 @@ class BISTDataFetcher {
         };
     }
 
-    // Main fetch - get all BIST penny stock data (with global 12s timeout)
+    // Fetch market data (USD/TRY, BIST100, Gold, VIX)
+    async fetchMarketData() {
+        try {
+            // Try v7 batch first for market indicators
+            const symbols = ['USDTRY=X', 'EURTRY=X', 'XU100.IS', 'GC=F', '^VIX'];
+            const results = await this.fetchViaYahooV7(symbols);
+            if (results) {
+                results.forEach(q => {
+                    if (q.symbol === 'USDTRY=X') {
+                        MARKET_FACTORS.usdTry.value = q.regularMarketPrice || 0;
+                        MARKET_FACTORS.usdTry.change = q.regularMarketChangePercent || 0;
+                    } else if (q.symbol === 'EURTRY=X') {
+                        MARKET_FACTORS.eurTry.value = q.regularMarketPrice || 0;
+                        MARKET_FACTORS.eurTry.change = q.regularMarketChangePercent || 0;
+                    } else if (q.symbol === 'XU100.IS') {
+                        MARKET_FACTORS.bist100.value = q.regularMarketPrice || 0;
+                        MARKET_FACTORS.bist100.change = q.regularMarketChangePercent || 0;
+                    } else if (q.symbol === 'GC=F') {
+                        const goldUsd = q.regularMarketPrice || 0;
+                        MARKET_FACTORS.goldTry.value = Math.round(goldUsd * (MARKET_FACTORS.usdTry.value || 38) / 31.1035);
+                        MARKET_FACTORS.goldTry.change = q.regularMarketChangePercent || 0;
+                    } else if (q.symbol === '^VIX') {
+                        MARKET_FACTORS.vix.value = q.regularMarketPrice || 0;
+                        MARKET_FACTORS.vix.change = q.regularMarketChangePercent || 0;
+                    }
+                });
+                return true;
+            }
+
+            // Fallback: fetch key market data via v8 chart
+            const marketSymbols = { 'USDTRY=X': 'usdTry', 'XU100.IS': 'bist100' };
+            for (const [sym, key] of Object.entries(marketSymbols)) {
+                const result = await this.fetchViaYahooV8(sym);
+                if (result?.meta) {
+                    MARKET_FACTORS[key].value = result.meta.regularMarketPrice || 0;
+                    MARKET_FACTORS[key].change = result.meta.regularMarketDayHigh && result.meta.chartPreviousClose
+                        ? ((result.meta.regularMarketPrice - result.meta.chartPreviousClose) / result.meta.chartPreviousClose * 100) : 0;
+                }
+            }
+        } catch (e) {
+            console.warn('Market data fetch failed:', e.message);
+        }
+    }
+
+    // Main fetch - try multiple strategies with global timeout
     async fetchAllStocks() {
         const globalTimeout = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Global timeout')), 12000)
+            setTimeout(() => reject(new Error('Global timeout')), 15000)
         );
 
         try {
             const fetchJob = async () => {
-                // Fetch market data first
-                await this.fetchMarketData();
+                // Fetch market data (non-blocking, best effort)
+                await this.fetchMarketData().catch(() => {});
 
-                // Yahoo Finance supports max ~50 symbols per request, split into batches
+                let allStocks = [];
+
+                // === Strategy 1: Try v7 batch API first (fastest if it works) ===
+                console.log('📡 Strateji 1: Yahoo v7 batch API deneniyor...');
                 const batchSize = 40;
-                const allStocks = [];
-
                 for (let i = 0; i < BIST_PENNY_SYMBOLS.length; i += batchSize) {
                     const batch = BIST_PENNY_SYMBOLS.slice(i, i + batchSize);
-                    const results = await this.fetchQuotes(batch);
-
+                    const results = await this.fetchViaYahooV7(batch);
                     if (results) {
-                        results.forEach(quote => {
-                            if (quote.regularMarketPrice && quote.regularMarketPrice > 0) {
-                                allStocks.push(this.quoteToStock(quote));
-                            }
+                        results.forEach(q => {
+                            if (q.regularMarketPrice > 0) allStocks.push(this.quoteToStock(q));
                         });
                     }
                 }
 
-                return allStocks;
+                if (allStocks.length > 5) {
+                    this.isLive = true;
+                    this.dataSource = 'yahoo-v7';
+                    console.log(`✅ v7 API: ${allStocks.length} hisse yüklendi`);
+                    return allStocks;
+                }
+
+                // === Strategy 2: Try v6 batch API ===
+                console.log('📡 Strateji 2: Yahoo v6 API deneniyor...');
+                allStocks = [];
+                for (let i = 0; i < BIST_PENNY_SYMBOLS.length; i += batchSize) {
+                    const batch = BIST_PENNY_SYMBOLS.slice(i, i + batchSize);
+                    const results = await this.fetchViaYahooV6(batch);
+                    if (results) {
+                        results.forEach(q => {
+                            if (q.regularMarketPrice > 0) allStocks.push(this.quoteToStock(q));
+                        });
+                    }
+                }
+
+                if (allStocks.length > 5) {
+                    this.isLive = true;
+                    this.dataSource = 'yahoo-v6';
+                    console.log(`✅ v6 API: ${allStocks.length} hisse yüklendi`);
+                    return allStocks;
+                }
+
+                // === Strategy 3: v8 chart API per symbol (slower but most reliable) ===
+                console.log('📡 Strateji 3: Yahoo v8 chart API deneniyor...');
+                allStocks = [];
+                // Only fetch a subset to avoid very long load times
+                const prioritySymbols = BIST_PENNY_SYMBOLS.slice(0, 30);
+                const promises = prioritySymbols.map(sym =>
+                    this.fetchViaYahooV8(sym)
+                        .then(result => result ? this.chartToStock(result) : null)
+                        .catch(() => null)
+                );
+
+                // Fetch 10 at a time to avoid overwhelming
+                for (let i = 0; i < promises.length; i += 10) {
+                    const batch = promises.slice(i, i + 10);
+                    const results = await Promise.all(batch);
+                    results.forEach(stock => {
+                        if (stock && stock.price > 0) allStocks.push(stock);
+                    });
+                }
+
+                if (allStocks.length > 3) {
+                    this.isLive = true;
+                    this.dataSource = 'yahoo-v8';
+                    console.log(`✅ v8 chart API: ${allStocks.length} hisse yüklendi (gerçek OHLCV dahil)`);
+                    return allStocks;
+                }
+
+                console.warn('⚠️ Tüm API stratejileri başarısız');
+                return [];
             };
 
             return await Promise.race([fetchJob(), globalTimeout]);
