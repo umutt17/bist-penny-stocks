@@ -198,51 +198,18 @@ class BISTDataFetcher {
             options: { lang: 'tr' }
         };
 
-        // Try direct POST first (TradingView might allow CORS)
+        // Direct POST without Content-Type header to avoid CORS preflight
+        // TradingView allows POST from github.io origins but does NOT allow
+        // Content-Type header in preflight, so we send as text/plain (simple request)
         try {
             const resp = await this.fetchWithTimeout(tvUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
                 body: JSON.stringify(payload)
-            }, 8000);
+            }, 10000);
             const data = await resp.json();
             if (data?.data?.length > 0) return data;
         } catch (e) {
-            console.log('TradingView direct failed, trying proxies...');
-        }
-
-        // Try via CORS proxies with POST body
-        for (const proxy of this.corsProxies) {
-            try {
-                // allorigins supports raw proxy
-                const proxyUrl = proxy + encodeURIComponent(tvUrl);
-                const resp = await this.fetchWithTimeout(proxyUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                }, 8000);
-                const data = await resp.json();
-                if (data?.data?.length > 0) return data;
-            } catch (e) {
-                continue;
-            }
-        }
-
-        // Last resort: Use allorigins GET with encoded POST body in URL
-        try {
-            const allOriginsUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(tvUrl)}`;
-            const resp = await this.fetchWithTimeout(allOriginsUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }, 8000);
-            const wrapper = await resp.json();
-            if (wrapper?.contents) {
-                const data = JSON.parse(wrapper.contents);
-                if (data?.data?.length > 0) return data;
-            }
-        } catch (e) {
-            // ignore
+            console.warn('TradingView direct failed:', e.message);
         }
 
         return null;
@@ -423,21 +390,17 @@ class BISTDataFetcher {
 
     // ===== MARKET DATA =====
     async fetchMarketData() {
-        // Try TradingView for market data too
+        // TradingView for market data - NO Content-Type to avoid CORS preflight
         try {
-            const tvUrl = 'https://scanner.tradingview.com/forex/scan';
-            const payload = {
-                columns: ['name', 'close', 'change'],
-                symbols: { tickers: ['FX_IDC:USDTRY', 'FX_IDC:EURTRY'] },
-                sort: { sortBy: 'name', sortOrder: 'asc' }
-            };
-
-            // Direct
+            // Forex (USD/TRY, EUR/TRY)
             try {
-                const resp = await this.fetchWithTimeout(tvUrl, {
+                const resp = await this.fetchWithTimeout('https://scanner.tradingview.com/forex/scan', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({
+                        columns: ['name', 'close', 'change'],
+                        symbols: { tickers: ['FX_IDC:USDTRY', 'FX_IDC:EURTRY'] },
+                        sort: { sortBy: 'name', sortOrder: 'asc' }
+                    })
                 }, 5000);
                 const data = await resp.json();
                 if (data?.data) {
@@ -453,29 +416,37 @@ class BISTDataFetcher {
                 }
             } catch (e) { /* ignore */ }
 
-            // BIST100 and VIX from index scanner
-            const idxPayload = {
-                columns: ['name', 'close', 'change'],
-                symbols: { tickers: ['BIST:XU100', 'TVC:VIX'] },
-                sort: { sortBy: 'name', sortOrder: 'asc' }
-            };
+            // BIST100 from turkey scanner
             try {
-                const resp = await this.fetchWithTimeout('https://scanner.tradingview.com/global/scan', {
+                const resp = await this.fetchWithTimeout('https://scanner.tradingview.com/turkey/scan', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(idxPayload)
+                    body: JSON.stringify({
+                        columns: ['name', 'close', 'change'],
+                        symbols: { tickers: ['BIST:XU100'] },
+                        sort: { sortBy: 'name', sortOrder: 'asc' }
+                    })
                 }, 5000);
                 const data = await resp.json();
-                if (data?.data) {
-                    data.data.forEach(row => {
-                        if (row.s?.includes('XU100')) {
-                            MARKET_FACTORS.bist100.value = row.d[1] || 0;
-                            MARKET_FACTORS.bist100.change = row.d[2] || 0;
-                        } else if (row.s?.includes('VIX')) {
-                            MARKET_FACTORS.vix.value = row.d[1] || 0;
-                            MARKET_FACTORS.vix.change = row.d[2] || 0;
-                        }
-                    });
+                if (data?.data?.[0]) {
+                    MARKET_FACTORS.bist100.value = data.data[0].d[1] || 0;
+                    MARKET_FACTORS.bist100.change = data.data[0].d[2] || 0;
+                }
+            } catch (e) { /* ignore */ }
+
+            // VIX from america scanner
+            try {
+                const resp = await this.fetchWithTimeout('https://scanner.tradingview.com/america/scan', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        columns: ['name', 'close', 'change'],
+                        symbols: { tickers: ['CBOE:VIX'] },
+                        sort: { sortBy: 'name', sortOrder: 'asc' }
+                    })
+                }, 5000);
+                const data = await resp.json();
+                if (data?.data?.[0]) {
+                    MARKET_FACTORS.vix.value = data.data[0].d[1] || 0;
+                    MARKET_FACTORS.vix.change = data.data[0].d[2] || 0;
                 }
             } catch (e) { /* ignore */ }
 
