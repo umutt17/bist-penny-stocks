@@ -89,8 +89,26 @@ class App {
             }
         }
 
+        // Ensure all stocks have required fields
+        stocks.forEach(s => {
+            if (!s.ma50) s.ma50 = s.price;
+            if (!s.ma200) s.ma200 = s.price;
+            if (!s.week52High) s.week52High = s.price * 1.3;
+            if (!s.week52Low) s.week52Low = s.price * 0.7;
+            if (!s.avgVolume) s.avgVolume = s.volume || 1;
+        });
+
         const pennyStocks = aiEngine.filterPennyStocks(stocks, 10);
-        this.analyzedStocks = aiEngine.analyzeAll(pennyStocks);
+        try {
+            this.analyzedStocks = aiEngine.analyzeAll(pennyStocks);
+        } catch (e) {
+            console.error('AI analysis error:', e);
+            // Minimal fallback analysis
+            this.analyzedStocks = pennyStocks.map(s => ({
+                ...s,
+                analysis: { totalScore: 50, signal: 'TUT', layers: {}, technical: { indicators: {}, signals: [] }, fundamental: { metrics: {}, signals: [] }, momentum: { metrics: {}, signals: [] }, sentiment: { signals: [] }, macroSector: { signals: [] }, risk: { riskMetrics: {}, signals: [] }, candles: { patterns: [] }, supportResistance: {}, forecast: { ensemble: {} }, riskLevel: 3, recommendation: 'Analiz hatası' }
+            }));
+        }
         this.sectorData = aiEngine.analyzeSectors(this.analyzedStocks);
     }
 

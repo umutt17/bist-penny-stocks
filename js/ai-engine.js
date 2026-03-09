@@ -959,7 +959,8 @@ class AIEngine {
         for (let i = 0; i < n; i++) {
             sumX += i; sumY += prices[i]; sumXY += i * prices[i]; sumX2 += i * i;
         }
-        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+        const denom = n * sumX2 - sumX * sumX;
+        const slope = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
         const intercept = (sumY - slope * sumX) / n;
 
         // R² and StdDev
@@ -1009,15 +1010,17 @@ class AIEngine {
         // Generate realistic OHLCV from stock data for indicators
         const data = [];
         const days = 60;
-        const basePrice = stock.week52Low + (stock.price - stock.week52Low) * 0.3;
-        const dailyReturn = (stock.price / basePrice) ** (1 / days) - 1;
-        const vol = (stock.week52High - stock.week52Low) / stock.week52Low / Math.sqrt(252);
+        const w52Low = stock.week52Low || stock.price * 0.7;
+        const w52High = stock.week52High || stock.price * 1.3;
+        const basePrice = Math.max(0.01, w52Low + (stock.price - w52Low) * 0.3);
+        const dailyReturn = basePrice > 0 ? (stock.price / basePrice) ** (1 / days) - 1 : 0;
+        const vol = w52Low > 0 ? (w52High - w52Low) / w52Low / Math.sqrt(252) : 0.02;
 
         let price = basePrice;
         for (let i = 0; i < days; i++) {
             const noise = (Math.random() - 0.5) * 2 * vol * price;
             const trend = dailyReturn * price;
-            price = Math.max(stock.week52Low * 0.9, price + trend + noise);
+            price = Math.max(w52Low * 0.9, price + trend + noise);
             const dayVol = vol * price;
             data.push({
                 open: price - dayVol * (Math.random() - 0.5),

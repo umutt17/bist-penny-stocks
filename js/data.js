@@ -172,9 +172,12 @@ class BISTDataFetcher {
         for (let attempt = 0; attempt < this.corsProxies.length; attempt++) {
             try {
                 const proxyUrl = this.proxy + encodeURIComponent(url);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 4000);
                 const response = await fetch(proxyUrl, {
-                    signal: AbortSignal.timeout(10000)
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
 
                 if (!response.ok) {
                     this.nextProxy();
@@ -259,34 +262,42 @@ class BISTDataFetcher {
         };
     }
 
-    // Main fetch - get all BIST penny stock data
+    // Main fetch - get all BIST penny stock data (with global 12s timeout)
     async fetchAllStocks() {
-        // Fetch market data first
-        await this.fetchMarketData();
+        const globalTimeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Global timeout')), 12000)
+        );
 
-        // Yahoo Finance supports max ~50 symbols per request, split into batches
-        const batchSize = 40;
-        const allStocks = [];
+        try {
+            const fetchJob = async () => {
+                // Fetch market data first
+                await this.fetchMarketData();
 
-        for (let i = 0; i < BIST_PENNY_SYMBOLS.length; i += batchSize) {
-            const batch = BIST_PENNY_SYMBOLS.slice(i, i + batchSize);
-            const results = await this.fetchQuotes(batch);
+                // Yahoo Finance supports max ~50 symbols per request, split into batches
+                const batchSize = 40;
+                const allStocks = [];
 
-            if (results) {
-                results.forEach(quote => {
-                    if (quote.regularMarketPrice && quote.regularMarketPrice > 0) {
-                        allStocks.push(this.quoteToStock(quote));
+                for (let i = 0; i < BIST_PENNY_SYMBOLS.length; i += batchSize) {
+                    const batch = BIST_PENNY_SYMBOLS.slice(i, i + batchSize);
+                    const results = await this.fetchQuotes(batch);
+
+                    if (results) {
+                        results.forEach(quote => {
+                            if (quote.regularMarketPrice && quote.regularMarketPrice > 0) {
+                                allStocks.push(this.quoteToStock(quote));
+                            }
+                        });
                     }
-                });
-            }
+                }
 
-            // Small delay between batches
-            if (i + batchSize < BIST_PENNY_SYMBOLS.length) {
-                await new Promise(r => setTimeout(r, 300));
-            }
+                return allStocks;
+            };
+
+            return await Promise.race([fetchJob(), globalTimeout]);
+        } catch (e) {
+            console.warn('fetchAllStocks timeout or error:', e.message);
+            return [];
         }
-
-        return allStocks;
     }
 }
 
