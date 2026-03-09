@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIST Penny Stocks AI Analyzer</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loader-content">
+            <div class="ai-brain">
+                <div class="brain-circle"></div>
+                <div class="brain-pulse"></div>
+                <div class="brain-pulse delay-1"></div>
+                <div class="brain-pulse delay-2"></div>
+            </div>
+            <h2>BIST AI Analyzer</h2>
+            <p id="loading-status">Yapay zeka modeli yükleniyor...</p>
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-inner">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>BIST Penny Stocks</h1>
+                    <span class="logo-subtitle">AI-Powered Analysis Engine</span>
+                </div>
+            </div>
+            <nav class="nav-links">
+                <a href="#dashboard" class="nav-link active" data-section="dashboard">
+                    <i class="fas fa-chart-line"></i> Dashboard
+                </a>
+                <a href="#scanner" class="nav-link" data-section="scanner">
+                    <i class="fas fa-search-dollar"></i> Tarayıcı
+                </a>
+                <a href="#analysis" class="nav-link" data-section="analysis">
+                    <i class="fas fa-brain"></i> AI Analiz
+                </a>
+                <a href="#watchlist" class="nav-link" data-section="watchlist">
+                    <i class="fas fa-star"></i> İzleme
+                </a>
+            </nav>
+            <div class="header-actions">
+                <button id="theme-toggle" class="icon-btn" title="Tema Değiştir">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <button id="refresh-btn" class="icon-btn" title="Verileri Yenile">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button class="mobile-menu-btn" id="mobile-menu-btn">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Mobile Menu -->
+    <div id="mobile-menu" class="mobile-menu">
+        <a href="#dashboard" class="mobile-link" data-section="dashboard">
+            <i class="fas fa-chart-line"></i> Dashboard
+        </a>
+        <a href="#scanner" class="mobile-link" data-section="scanner">
+            <i class="fas fa-search-dollar"></i> Tarayıcı
+        </a>
+        <a href="#analysis" class="mobile-link" data-section="analysis">
+            <i class="fas fa-brain"></i> AI Analiz
+        </a>
+        <a href="#watchlist" class="mobile-link" data-section="watchlist">
+            <i class="fas fa-star"></i> İzleme Listesi
+        </a>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="section active">
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card gradient-blue">
+                    <div class="stat-icon"><i class="fas fa-building"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="total-stocks">0</span>
+                        <span class="stat-label">Toplam Hisse</span>
+                    </div>
+                </div>
+                <div class="stat-card gradient-green">
+                    <div class="stat-icon"><i class="fas fa-coins"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="penny-count">0</span>
+                        <span class="stat-label">Penny Stock</span>
+                    </div>
+                </div>
+                <div class="stat-card gradient-purple">
+                    <div class="stat-icon"><i class="fas fa-fire"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="hot-picks">0</span>
+                        <span class="stat-label">Sıcak Fırsat</span>
+                    </div>
+                </div>
+                <div class="stat-card gradient-orange">
+                    <div class="stat-icon"><i class="fas fa-chart-bar"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="avg-score">0</span>
+                        <span class="stat-label">Ort. AI Skor</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-trophy"></i> En İyi Penny Stocks (AI Skoru)</h3>
+                        <span class="badge badge-ai">AI Powered</span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="topStocksChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-industry"></i> Sektör Dağılımı</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="sectorChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Market Sentiment -->
+            <div class="sentiment-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-brain"></i> AI Piyasa Duyarlılığı</h3>
+                    <span class="badge badge-live">CANLI</span>
+                </div>
+                <div class="sentiment-grid" id="sentiment-grid">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+
+            <!-- Top Picks Table -->
+            <div class="table-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-gem"></i> AI Top 10 Penny Stock Önerileri</h3>
+                    <div class="header-controls">
+                        <select id="sort-select" class="select-input">
+                            <option value="score">AI Skoruna Göre</option>
+                            <option value="momentum">Momentuma Göre</option>
+                            <option value="value">Değere Göre</option>
+                            <option value="technical">Teknik Analize Göre</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Sıra</th>
+                                <th>Hisse</th>
+                                <th>Fiyat (₺)</th>
+                                <th>Değişim</th>
+                                <th>Hacim</th>
+                                <th>AI Skor</th>
+                                <th>Sinyal</th>
+                                <th>Risk</th>
+                                <th>Detay</th>
+                            </tr>
+                        </thead>
+                        <tbody id="top-picks-body">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Scanner Section -->
+        <section id="scanner" class="section">
+            <div class="scanner-header">
+                <h2><i class="fas fa-satellite-dish"></i> Gelişmiş Penny Stock Tarayıcı</h2>
+                <p>BIST'teki tüm hisseleri ileri düzey algoritmalarla tarayın</p>
+            </div>
+
+            <!-- Filter Controls -->
+            <div class="filter-card">
+                <div class="filter-grid">
+                    <div class="filter-group">
+                        <label>Fiyat Aralığı (₺)</label>
+                        <div class="range-inputs">
+                            <input type="number" id="price-min" value="0" min="0" step="0.01" class="input-field">
+                            <span>-</span>
+                            <input type="number" id="price-max" value="10" min="0" step="0.01" class="input-field">
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <label>Min. Günlük Hacim</label>
+                        <select id="volume-filter" class="select-input">
+                            <option value="0">Tümü</option>
+                            <option value="100000">100K+</option>
+                            <option value="500000" selected>500K+</option>
+                            <option value="1000000">1M+</option>
+                            <option value="5000000">5M+</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Min. AI Skoru</label>
+                        <select id="score-filter" class="select-input">
+                            <option value="0">Tümü</option>
+                            <option value="50">50+</option>
+                            <option value="60">60+</option>
+                            <option value="70" selected>70+</option>
+                            <option value="80">80+</option>
+                            <option value="90">90+</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Sektör</label>
+                        <select id="sector-filter" class="select-input">
+                            <option value="all">Tüm Sektörler</option>
+                            <option value="Teknoloji">Teknoloji</option>
+                            <option value="Sanayi">Sanayi</option>
+                            <option value="Finans">Finans</option>
+                            <option value="Enerji">Enerji</option>
+                            <option value="Madencilik">Madencilik</option>
+                            <option value="Gıda">Gıda</option>
+                            <option value="Tekstil">Tekstil</option>
+                            <option value="İnşaat">İnşaat</option>
+                            <option value="Ulaştırma">Ulaştırma</option>
+                            <option value="Turizm">Turizm</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Sinyal</label>
+                        <select id="signal-filter" class="select-input">
+                            <option value="all">Tüm Sinyaller</option>
+                            <option value="GÜÇLÜ AL">Güçlü Al</option>
+                            <option value="AL">Al</option>
+                            <option value="TUT">Tut</option>
+                        </select>
+                    </div>
+                    <div class="filter-group filter-actions">
+                        <button id="scan-btn" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Tara
+                        </button>
+                        <button id="reset-filters" class="btn btn-secondary">
+                            <i class="fas fa-undo"></i> Sıfırla
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scanner Results -->
+            <div class="scanner-results">
+                <div class="results-header">
+                    <span id="result-count">0 sonuç bulundu</span>
+                    <button id="export-btn" class="btn btn-sm">
+                        <i class="fas fa-download"></i> CSV İndir
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort="symbol">Hisse <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-sort="name">Şirket <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-sort="sector">Sektör <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-sort="price">Fiyat <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-sort="change">Değişim <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-sort="volume">Hacim <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-sort="score">AI Skor <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-sort="signal">Sinyal <i class="fas fa-sort"></i></th>
+                                <th>İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scanner-body">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- AI Analysis Section -->
+        <section id="analysis" class="section">
+            <div class="analysis-header">
+                <h2><i class="fas fa-brain"></i> AI Derinlemesine Analiz</h2>
+                <p>Hisse seçin, yapay zeka tüm faktörleri analiz etsin</p>
+            </div>
+
+            <div class="analysis-search">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="analysis-search" placeholder="Hisse kodu yazın (örn: THYAO)" class="search-input" autocomplete="off">
+                    <div id="search-suggestions" class="search-suggestions"></div>
+                </div>
+                <button id="analyze-btn" class="btn btn-primary btn-lg">
+                    <i class="fas fa-brain"></i> AI ile Analiz Et
+                </button>
+            </div>
+
+            <div id="analysis-result" class="analysis-result hidden">
+                <!-- Stock Header -->
+                <div class="analysis-stock-header" id="analysis-stock-header">
+                    <!-- Filled by JS -->
+                </div>
+
+                <!-- Analysis Tabs -->
+                <div class="analysis-tabs">
+                    <button class="tab-btn active" data-tab="overview">Genel Bakış</button>
+                    <button class="tab-btn" data-tab="technical">Teknik Analiz</button>
+                    <button class="tab-btn" data-tab="fundamental">Temel Analiz</button>
+                    <button class="tab-btn" data-tab="sentiment">Duyarlılık</button>
+                    <button class="tab-btn" data-tab="risk">Risk Analizi</button>
+                </div>
+
+                <!-- Tab Contents -->
+                <div class="tab-content active" id="tab-overview">
+                    <div class="overview-grid" id="overview-content">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+                <div class="tab-content" id="tab-technical">
+                    <div id="technical-content"></div>
+                </div>
+                <div class="tab-content" id="tab-fundamental">
+                    <div id="fundamental-content"></div>
+                </div>
+                <div class="tab-content" id="tab-sentiment">
+                    <div id="sentiment-content"></div>
+                </div>
+                <div class="tab-content" id="tab-risk">
+                    <div id="risk-content"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Watchlist Section -->
+        <section id="watchlist" class="section">
+            <div class="watchlist-header">
+                <h2><i class="fas fa-star"></i> İzleme Listem</h2>
+                <p>Favori penny stock'larınızı takip edin</p>
+            </div>
+            <div id="watchlist-empty" class="empty-state">
+                <i class="fas fa-star"></i>
+                <h3>İzleme listeniz boş</h3>
+                <p>Tarayıcıdan veya analizden hisseleri yıldızlayarak ekleyin</p>
+            </div>
+            <div id="watchlist-grid" class="watchlist-grid">
+                <!-- Filled by JS -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Stock Detail Modal -->
+    <div id="stock-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Hisse Detay</h3>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Filled by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Scripts -->
+    <script src="js/data.js"></script>
+    <script src="js/ai-engine.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
