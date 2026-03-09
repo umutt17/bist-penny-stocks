@@ -1168,6 +1168,137 @@ class AIEngine {
         });
         return sectors;
     }
+
+    // ===================================================================
+    // SHORT-TERM vs LONG-TERM PROJECTION SCORING
+    // ===================================================================
+
+    // Short-term score (1-3 months): Momentum, technical, volume, breakout focus
+    shortTermScore(stock) {
+        const a = stock.analysis;
+        const tv = stock._tvIndicators || {};
+        let score = 0;
+        const reasons = [];
+
+        // 1. Momentum (%40 weight)
+        const perf1M = tv.perf1M || 0;
+        const perf3M = tv.perf3M || 0;
+        const perfW = tv.perfW || 0;
+
+        if (perfW > 5) { score += 15; reasons.push(`Haftalik %${r(perfW)} yukselis`); }
+        else if (perfW > 2) { score += 8; }
+        else if (perfW < -5) { score -= 10; }
+
+        if (perf1M > 10) { score += 15; reasons.push(`Aylik %${r(perf1M)} yukselis`); }
+        else if (perf1M > 5) { score += 10; }
+        else if (perf1M < -10) { score -= 12; reasons.push(`Aylik %${r(perf1M)} dusus`); }
+
+        if (perf3M > 20) { score += 10; }
+        else if (perf3M > 10) { score += 5; }
+
+        // 2. Technical signals (%30 weight)
+        const rsi = tv.rsi || a.technical?.indicators?.rsi || 50;
+        if (rsi > 40 && rsi < 60) { score += 8; reasons.push('RSI notr bolge - sicrama potansiyeli'); }
+        else if (rsi < 35) { score += 12; reasons.push(`RSI ${r(rsi)} - asiri satim`); }
+        else if (rsi > 70) { score -= 8; }
+
+        const macdBull = tv.macdVal > tv.macdSignal;
+        if (macdBull) { score += 10; reasons.push('MACD yukselis sinyali'); }
+        else { score -= 5; }
+
+        // TradingView recommendation
+        const rec = tv.recAll || 0;
+        if (rec > 0.3) { score += 12; reasons.push('TradingView: GUCLU AL'); }
+        else if (rec > 0.1) { score += 6; }
+        else if (rec < -0.3) { score -= 10; reasons.push('TradingView: SAT'); }
+
+        // 3. Volume breakout (%15 weight)
+        const volRatio = stock.volume / Math.max(1, stock.avgVolume);
+        if (volRatio > 2 && stock.change > 0) { score += 12; reasons.push(`Hacim ${volRatio.toFixed(1)}x - breakout`); }
+        else if (volRatio > 1.5 && stock.change > 0) { score += 6; }
+
+        // 4. Price position (%15 weight)
+        const pos52w = stock.week52High > stock.week52Low
+            ? (stock.price - stock.week52Low) / (stock.week52High - stock.week52Low) * 100 : 50;
+        if (pos52w < 30) { score += 10; reasons.push(`52 hafta dibinden %${r(pos52w)} yukarda`); }
+        else if (pos52w > 85) { score -= 8; }
+
+        // Bollinger position
+        if (tv.bbLower && stock.price <= tv.bbLower * 1.02) {
+            score += 8; reasons.push('Bollinger alt bandinda');
+        }
+
+        // Normalize 0-100
+        const normalized = Math.min(100, Math.max(0, 50 + score));
+        const signal = normalized >= 75 ? 'GUCLU AL' : normalized >= 60 ? 'AL' : normalized >= 40 ? 'BEKLE' : 'KACINMA';
+
+        return { score: normalized, signal, reasons: reasons.slice(0, 5) };
+    }
+
+    // Long-term score (6-12 months): Fundamentals, value, growth, trend focus
+    longTermScore(stock) {
+        const a = stock.analysis;
+        const tv = stock._tvIndicators || {};
+        let score = 0;
+        const reasons = [];
+
+        // 1. Valuation (%30 weight)
+        if (stock.pe > 0 && stock.pe < 8) { score += 18; reasons.push(`F/K ${stock.pe} - cok ucuz`); }
+        else if (stock.pe > 0 && stock.pe < 15) { score += 10; reasons.push(`F/K ${stock.pe} - uygun`); }
+        else if (stock.pe > 30) { score -= 10; }
+
+        if (stock.pb > 0 && stock.pb < 1) { score += 12; reasons.push(`PD/DD ${stock.pb} - deger altinda`); }
+        else if (stock.pb > 0 && stock.pb < 2) { score += 6; }
+        else if (stock.pb > 5) { score -= 8; }
+
+        // 2. Profitability (%25 weight)
+        const roe = stock.roe || 0;
+        if (roe > 20) { score += 15; reasons.push(`ROE %${r(roe)} - yuksek karlılık`); }
+        else if (roe > 10) { score += 8; }
+        else if (roe < 0) { score -= 15; reasons.push('Negatif ROE - zarar'); }
+
+        // Dividend
+        if (stock.dividend > 5) { score += 8; reasons.push(`Temettu %${r(stock.dividend)}`); }
+        else if (stock.dividend > 2) { score += 4; }
+
+        // 3. Long-term trend (%25 weight)
+        const perf6M = tv.perf6M || 0;
+        const perfY = tv.perfY || 0;
+
+        if (perfY > 50) { score += 12; reasons.push(`Yillik %${r(perfY)} getiri`); }
+        else if (perfY > 20) { score += 8; }
+        else if (perfY < -30) { score -= 12; reasons.push(`Yillik %${r(perfY)} kayip`); }
+
+        if (perf6M > 30) { score += 8; }
+        else if (perf6M < -20) { score -= 6; }
+
+        // Price vs MA200 (long-term trend)
+        if (stock.ma200 > 0 && stock.price > stock.ma200) {
+            score += 8; reasons.push('Fiyat 200 gunluk ortalamanin ustunde');
+        } else if (stock.ma200 > 0 && stock.price < stock.ma200 * 0.9) {
+            score -= 5;
+        }
+
+        // 4. Financial health (%20 weight)
+        const debtRatio = stock.debt || 40;
+        if (debtRatio < 25) { score += 10; reasons.push('Dusuk borclanma'); }
+        else if (debtRatio > 70) { score -= 10; reasons.push('Yuksek borclanma riski'); }
+
+        const currentRatio = tv.currentRatio || 0;
+        if (currentRatio > 2) { score += 6; reasons.push(`Cari oran ${r(currentRatio)} - guclü`); }
+        else if (currentRatio > 0 && currentRatio < 1) { score -= 8; }
+
+        // Market cap (micro/small cap premium for penny stocks)
+        if (stock.marketCap > 0 && stock.marketCap < 500000000) {
+            score += 4; reasons.push('Kucuk piyasa degeri - buyume potansiyeli');
+        }
+
+        // Normalize 0-100
+        const normalized = Math.min(100, Math.max(0, 50 + score));
+        const signal = normalized >= 75 ? 'GUCLU AL' : normalized >= 60 ? 'BIRIKTIR' : normalized >= 40 ? 'BEKLE' : 'UZAK DUR';
+
+        return { score: normalized, signal, reasons: reasons.slice(0, 5) };
+    }
 }
 
 // Round helper

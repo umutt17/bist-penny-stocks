@@ -209,6 +209,7 @@ class App {
         document.getElementById('mobile-menu').classList.remove('active');
 
         if (section === 'scanner') this.runScanner();
+        if (section === 'projection') this.renderProjection();
     }
 
     // ===== Theme =====
@@ -1089,6 +1090,142 @@ class App {
         toast.innerHTML = `<i class="fas fa-${icons[type]}"></i> ${message}`;
         toast.className = `toast ${type} active`;
         setTimeout(() => toast.classList.remove('active'), 3000);
+    }
+
+    // ===== PROJECTION RENDERING =====
+    renderProjection() {
+        if (!this.analyzedStocks.length) return;
+
+        // Calculate short-term and long-term scores for all stocks
+        const projected = this.analyzedStocks.map(stock => ({
+            ...stock,
+            shortTerm: aiEngine.shortTermScore(stock),
+            longTerm: aiEngine.longTermScore(stock)
+        }));
+
+        // Sort by short-term score
+        const shortTermTop = [...projected]
+            .sort((a, b) => b.shortTerm.score - a.shortTerm.score)
+            .slice(0, 15);
+
+        // Sort by long-term score
+        const longTermTop = [...projected]
+            .sort((a, b) => b.longTerm.score - a.longTerm.score)
+            .slice(0, 15);
+
+        // Both term stars (high in both)
+        const bothTerm = [...projected]
+            .filter(s => s.shortTerm.score >= 60 && s.longTerm.score >= 60)
+            .sort((a, b) => (b.shortTerm.score + b.longTerm.score) - (a.shortTerm.score + a.longTerm.score))
+            .slice(0, 10);
+
+        // Stats
+        const shortCount = projected.filter(s => s.shortTerm.score >= 65).length;
+        const longCount = projected.filter(s => s.longTerm.score >= 65).length;
+
+        document.getElementById('short-term-count').textContent = shortCount;
+        document.getElementById('long-term-count').textContent = longCount;
+        document.getElementById('both-term-count').textContent = bothTerm.length;
+        document.getElementById('projection-source').textContent =
+            this.dataSource === 'live' ? 'Canli' : 'Statik';
+
+        // Render short-term table
+        const stBody = document.getElementById('short-term-body');
+        stBody.innerHTML = shortTermTop.map((s, i) => {
+            const tv = s._tvIndicators || {};
+            const perfW = tv.perfW || 0;
+            const perf1M = tv.perf1M || 0;
+            const perf3M = tv.perf3M || 0;
+            return `<tr>
+                <td>${i + 1}</td>
+                <td><strong>${s.symbol}</strong><br><small style="color:var(--text-muted)">${s.name.substring(0, 18)}</small></td>
+                <td>₺${s.price.toFixed(2)}</td>
+                <td style="color:${perfW >= 0 ? '#10b981' : '#ef4444'}">%${perfW > 0 ? '+' : ''}${perfW.toFixed(1)}</td>
+                <td style="color:${perf1M >= 0 ? '#10b981' : '#ef4444'}">%${perf1M > 0 ? '+' : ''}${perf1M.toFixed(1)}</td>
+                <td style="color:${perf3M >= 0 ? '#10b981' : '#ef4444'}">%${perf3M > 0 ? '+' : ''}${perf3M.toFixed(1)}</td>
+                <td>${formatVolume(s.volume)}</td>
+                <td>${renderScoreBadge(s.shortTerm.score)}</td>
+                <td>${this._projSignalBadge(s.shortTerm.signal)}</td>
+                <td><small>${s.shortTerm.reasons.slice(0, 2).join('; ')}</small></td>
+            </tr>`;
+        }).join('');
+
+        // Render long-term table
+        const ltBody = document.getElementById('long-term-body');
+        ltBody.innerHTML = longTermTop.map((s, i) => {
+            const tv = s._tvIndicators || {};
+            const perfY = tv.perfY || 0;
+            return `<tr>
+                <td>${i + 1}</td>
+                <td><strong>${s.symbol}</strong><br><small style="color:var(--text-muted)">${s.name.substring(0, 18)}</small></td>
+                <td>₺${s.price.toFixed(2)}</td>
+                <td>${s.pe > 0 ? s.pe.toFixed(1) : '-'}</td>
+                <td>${s.pb > 0 ? s.pb.toFixed(2) : '-'}</td>
+                <td style="color:${s.roe > 10 ? '#10b981' : s.roe < 0 ? '#ef4444' : 'inherit'}">%${s.roe.toFixed(1)}</td>
+                <td style="color:${perfY >= 0 ? '#10b981' : '#ef4444'}">%${perfY > 0 ? '+' : ''}${perfY.toFixed(1)}</td>
+                <td>${renderScoreBadge(s.longTerm.score)}</td>
+                <td>${this._projSignalBadge(s.longTerm.signal)}</td>
+                <td><small>${s.longTerm.reasons.slice(0, 2).join('; ')}</small></td>
+            </tr>`;
+        }).join('');
+
+        // Render both-term stars
+        const btBody = document.getElementById('both-term-body');
+        if (bothTerm.length === 0) {
+            btBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text-muted)">Her iki vadede de guclu (skor >= 60) hisse bulunamadi</td></tr>';
+        } else {
+            btBody.innerHTML = bothTerm.map((s, i) => {
+                const total = s.shortTerm.score + s.longTerm.score;
+                return `<tr>
+                    <td>${i + 1}</td>
+                    <td><strong>${s.symbol}</strong><br><small style="color:var(--text-muted)">${s.name.substring(0, 18)}</small></td>
+                    <td>₺${s.price.toFixed(2)}</td>
+                    <td style="color:${s.change >= 0 ? '#10b981' : '#ef4444'}">%${s.change > 0 ? '+' : ''}${s.change.toFixed(1)}</td>
+                    <td>${renderScoreBadge(s.shortTerm.score)}</td>
+                    <td>${renderScoreBadge(s.longTerm.score)}</td>
+                    <td><strong style="color:#8b5cf6">${total}</strong></td>
+                    <td>${this._projSignalBadge(s.shortTerm.signal)}</td>
+                    <td>${this._projSignalBadge(s.longTerm.signal)}</td>
+                    <td><button class="btn-small" onclick="app.showStockDetail('${s.symbol}')">Detay</button></td>
+                </tr>`;
+            }).join('');
+        }
+
+        // Render live news
+        this._renderLiveNews();
+    }
+
+    _projSignalBadge(signal) {
+        const colors = {
+            'GUCLU AL': '#10b981', 'AL': '#34d399', 'BIRIKTIR': '#3b82f6',
+            'BEKLE': '#f59e0b', 'KACINMA': '#ef4444', 'UZAK DUR': '#dc2626'
+        };
+        const color = colors[signal] || '#6b7280';
+        return `<span style="background:${color}22;color:${color};padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">${signal}</span>`;
+    }
+
+    _renderLiveNews() {
+        const grid = document.getElementById('live-news-grid');
+        if (!grid) return;
+
+        if (NEWS_SENTIMENT.length === 0) {
+            grid.innerHTML = '<p style="color:var(--text-muted);padding:16px;">Haber verisi yuklenemedi</p>';
+            return;
+        }
+
+        grid.innerHTML = NEWS_SENTIMENT.slice(0, 8).map(news => {
+            const sentColors = { positive: '#10b981', negative: '#ef4444', neutral: '#f59e0b' };
+            const sentLabels = { positive: 'Olumlu', negative: 'Olumsuz', neutral: 'Notr' };
+            const color = sentColors[news.sentiment] || '#6b7280';
+            return `<div class="sentiment-card" style="border-left: 3px solid ${color}">
+                <div style="font-size:0.85rem;margin-bottom:4px;">${news.title}</div>
+                <div style="display:flex;gap:8px;align-items:center;font-size:0.7rem;color:var(--text-muted)">
+                    <span style="color:${color};font-weight:600">${sentLabels[news.sentiment] || 'Notr'}</span>
+                    ${news.source ? `<span>${news.source}</span>` : ''}
+                    ${news.sector !== 'all' ? `<span style="background:var(--bg-card);padding:1px 6px;border-radius:4px;">${news.sector}</span>` : ''}
+                </div>
+            </div>`;
+        }).join('');
     }
 }
 

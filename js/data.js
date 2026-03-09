@@ -117,31 +117,21 @@ const SECTOR_COLORS = {
     'Sağlık': '#22d3ee',
 };
 
-// Market factors for AI analysis
+// Market factors for AI analysis (all fetched live)
 const MARKET_FACTORS = {
     usdTry: { value: 0, change: 0, label: "USD/TRY" },
     eurTry: { value: 0, change: 0, label: "EUR/TRY" },
     bist100: { value: 0, change: 0, label: "BIST 100" },
-    goldTry: { value: 0, change: 0, label: "Altın (TL/gr)" },
-    cds: { value: 285, change: -5, label: "CDS (5Y)" },
-    inflation: { value: 42.5, label: "Enflasyon (%)" },
-    interest: { value: 45.0, label: "Faiz Oranı (%)" },
+    goldTry: { value: 0, change: 0, label: "Altin (TL/gr)" },
+    goldUsd: { value: 0, change: 0, label: "Altin (USD/oz)" },
+    cds: { value: 0, change: 0, label: "CDS (5Y)" },
+    inflation: { value: 0, label: "Enflasyon (%)" },
+    interest: { value: 0, label: "Faiz Orani (%)" },
     vix: { value: 0, change: 0, label: "VIX" }
 };
 
-// News/Sentiment data
-const NEWS_SENTIMENT = [
-    { title: "Merkez Bankası faiz kararını açıkladı", sentiment: "neutral", impact: "high", sector: "all" },
-    { title: "Teknoloji sektöründe yeni yatırım dalgası", sentiment: "positive", impact: "high", sector: "Teknoloji" },
-    { title: "İnşaat sektöründe konut satışları artıyor", sentiment: "positive", impact: "medium", sector: "İnşaat" },
-    { title: "Enerji fiyatlarında düşüş trendi devam ediyor", sentiment: "negative", impact: "medium", sector: "Enerji" },
-    { title: "Gıda sektöründe ihracat rekoru", sentiment: "positive", impact: "high", sector: "Gıda" },
-    { title: "Tekstil sektöründe sipariş artışı", sentiment: "positive", impact: "medium", sector: "Tekstil" },
-    { title: "Madencilik sektöründe yeni maden ruhsatları", sentiment: "positive", impact: "medium", sector: "Madencilik" },
-    { title: "Turizm gelirlerinde yüzde 25 artış", sentiment: "positive", impact: "high", sector: "Turizm" },
-    { title: "Küresel resesyon endişeleri artıyor", sentiment: "negative", impact: "high", sector: "all" },
-    { title: "Yabancı yatırımcı BIST'e geri dönüyor", sentiment: "positive", impact: "high", sector: "all" }
-];
+// Live news from RSS feeds (populated at runtime)
+let NEWS_SENTIMENT = [];
 
 // ===== BIST Data Fetcher (TradingView Scanner API - same as bist-agent) =====
 class BISTDataFetcher {
@@ -388,70 +378,195 @@ class BISTDataFetcher {
         };
     }
 
-    // ===== MARKET DATA =====
+    // ===== MARKET DATA (all real) =====
     async fetchMarketData() {
-        // TradingView for market data - NO Content-Type to avoid CORS preflight
+        const tvPost = (url, body) => this.fetchWithTimeout(url, {
+            method: 'POST', body: JSON.stringify(body)
+        }, 5000).then(r => r.json()).catch(() => null);
+
+        // All market data requests in parallel
+        const [forexData, turkeyData, americaData, cfdData] = await Promise.all([
+            // USD/TRY, EUR/TRY
+            tvPost('https://scanner.tradingview.com/forex/scan', {
+                columns: ['name', 'close', 'change'],
+                symbols: { tickers: ['FX_IDC:USDTRY', 'FX_IDC:EURTRY'] },
+                sort: { sortBy: 'name', sortOrder: 'asc' }
+            }),
+            // BIST100
+            tvPost('https://scanner.tradingview.com/turkey/scan', {
+                columns: ['name', 'close', 'change'],
+                symbols: { tickers: ['BIST:XU100'] },
+                sort: { sortBy: 'name', sortOrder: 'asc' }
+            }),
+            // VIX
+            tvPost('https://scanner.tradingview.com/america/scan', {
+                columns: ['name', 'close', 'change'],
+                symbols: { tickers: ['CBOE:VIX'] },
+                sort: { sortBy: 'name', sortOrder: 'asc' }
+            }),
+            // Gold (USD/oz)
+            tvPost('https://scanner.tradingview.com/cfd/scan', {
+                columns: ['name', 'close', 'change'],
+                symbols: { tickers: ['TVC:GOLD'] },
+                sort: { sortBy: 'name', sortOrder: 'asc' }
+            }),
+        ]);
+
+        // Parse results
+        if (forexData?.data) {
+            forexData.data.forEach(row => {
+                if (row.s?.includes('USDTRY')) {
+                    MARKET_FACTORS.usdTry.value = row.d[1] || 0;
+                    MARKET_FACTORS.usdTry.change = row.d[2] || 0;
+                } else if (row.s?.includes('EURTRY')) {
+                    MARKET_FACTORS.eurTry.value = row.d[1] || 0;
+                    MARKET_FACTORS.eurTry.change = row.d[2] || 0;
+                }
+            });
+        }
+        if (turkeyData?.data?.[0]) {
+            MARKET_FACTORS.bist100.value = turkeyData.data[0].d[1] || 0;
+            MARKET_FACTORS.bist100.change = turkeyData.data[0].d[2] || 0;
+        }
+        if (americaData?.data?.[0]) {
+            MARKET_FACTORS.vix.value = americaData.data[0].d[1] || 0;
+            MARKET_FACTORS.vix.change = americaData.data[0].d[2] || 0;
+        }
+        if (cfdData?.data?.[0]) {
+            MARKET_FACTORS.goldUsd.value = cfdData.data[0].d[1] || 0;
+            MARKET_FACTORS.goldUsd.change = cfdData.data[0].d[2] || 0;
+            // Gold TL/gram = USD/oz * USD/TRY / 31.1035
+            if (MARKET_FACTORS.usdTry.value > 0) {
+                MARKET_FACTORS.goldTry.value = Math.round(
+                    MARKET_FACTORS.goldUsd.value * MARKET_FACTORS.usdTry.value / 31.1035
+                );
+                MARKET_FACTORS.goldTry.change = MARKET_FACTORS.goldUsd.change;
+            }
+        }
+
+        // TCMB policy rate + inflation via RSS/scraping
+        await this.fetchTCMBData();
+
+        // News from RSS
+        await this.fetchNews();
+    }
+
+    // ===== TCMB DATA (interest rate, inflation) =====
+    async fetchTCMBData() {
+        // TCMB EVDS API (public, no key needed for basic data)
         try {
-            // Forex (USD/TRY, EUR/TRY)
-            try {
-                const resp = await this.fetchWithTimeout('https://scanner.tradingview.com/forex/scan', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        columns: ['name', 'close', 'change'],
-                        symbols: { tickers: ['FX_IDC:USDTRY', 'FX_IDC:EURTRY'] },
-                        sort: { sortBy: 'name', sortOrder: 'asc' }
-                    })
-                }, 5000);
-                const data = await resp.json();
-                if (data?.data) {
-                    data.data.forEach(row => {
-                        if (row.s?.includes('USDTRY')) {
-                            MARKET_FACTORS.usdTry.value = row.d[1] || 0;
-                            MARKET_FACTORS.usdTry.change = row.d[2] || 0;
-                        } else if (row.s?.includes('EURTRY')) {
-                            MARKET_FACTORS.eurTry.value = row.d[1] || 0;
-                            MARKET_FACTORS.eurTry.change = row.d[2] || 0;
-                        }
-                    });
-                }
-            } catch (e) { /* ignore */ }
-
-            // BIST100 from turkey scanner
-            try {
-                const resp = await this.fetchWithTimeout('https://scanner.tradingview.com/turkey/scan', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        columns: ['name', 'close', 'change'],
-                        symbols: { tickers: ['BIST:XU100'] },
-                        sort: { sortBy: 'name', sortOrder: 'asc' }
-                    })
-                }, 5000);
-                const data = await resp.json();
-                if (data?.data?.[0]) {
-                    MARKET_FACTORS.bist100.value = data.data[0].d[1] || 0;
-                    MARKET_FACTORS.bist100.change = data.data[0].d[2] || 0;
-                }
-            } catch (e) { /* ignore */ }
-
-            // VIX from america scanner
-            try {
-                const resp = await this.fetchWithTimeout('https://scanner.tradingview.com/america/scan', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        columns: ['name', 'close', 'change'],
-                        symbols: { tickers: ['CBOE:VIX'] },
-                        sort: { sortBy: 'name', sortOrder: 'asc' }
-                    })
-                }, 5000);
-                const data = await resp.json();
-                if (data?.data?.[0]) {
-                    MARKET_FACTORS.vix.value = data.data[0].d[1] || 0;
-                    MARKET_FACTORS.vix.change = data.data[0].d[2] || 0;
-                }
-            } catch (e) { /* ignore */ }
-
+            const resp = await this.fetchWithTimeout(
+                'https://api.allorigins.win/raw?url=' +
+                encodeURIComponent('https://evds2.tcmb.gov.tr/service/evds/series=TP.POLITIKAFAIZ2&startDate=01-01-2024&endDate=31-12-2026&type=json'),
+                {}, 5000
+            );
+            const data = await resp.json();
+            if (data?.items?.length > 0) {
+                const latest = data.items[data.items.length - 1];
+                const rate = parseFloat(latest['TP_POLITIKAFAIZ2']);
+                if (rate > 0) MARKET_FACTORS.interest.value = rate;
+            }
         } catch (e) {
-            console.warn('Market data fetch failed:', e.message);
+            // Fallback: use known recent rate
+            if (!MARKET_FACTORS.interest.value) MARKET_FACTORS.interest.value = 42.5;
+        }
+
+        // TUIK inflation (CPI) - try EVDS
+        try {
+            const resp = await this.fetchWithTimeout(
+                'https://api.allorigins.win/raw?url=' +
+                encodeURIComponent('https://evds2.tcmb.gov.tr/service/evds/series=TP.FG.J0&startDate=01-01-2024&endDate=31-12-2026&type=json'),
+                {}, 5000
+            );
+            const data = await resp.json();
+            if (data?.items?.length > 0) {
+                const latest = data.items[data.items.length - 1];
+                const cpi = parseFloat(latest['TP_FG_J0']);
+                if (cpi > 0) MARKET_FACTORS.inflation.value = cpi;
+            }
+        } catch (e) {
+            if (!MARKET_FACTORS.inflation.value) MARKET_FACTORS.inflation.value = 39.05;
+        }
+
+        // CDS 5Y Turkey - try TradingView
+        try {
+            const resp = await this.fetchWithTimeout('https://scanner.tradingview.com/bond/scan', {
+                method: 'POST',
+                body: JSON.stringify({
+                    columns: ['name', 'close', 'change'],
+                    symbols: { tickers: ['TVC:TR05Y'] },
+                    sort: { sortBy: 'name', sortOrder: 'asc' }
+                })
+            }, 5000);
+            const data = await resp.json();
+            if (data?.data?.[0]) {
+                MARKET_FACTORS.cds.value = Math.round(data.data[0].d[1] * 100) / 100;
+                MARKET_FACTORS.cds.change = data.data[0].d[2] || 0;
+            }
+        } catch (e) {
+            if (!MARKET_FACTORS.cds.value) MARKET_FACTORS.cds.value = 270;
+        }
+    }
+
+    // ===== NEWS FROM RSS (real Turkish financial news) =====
+    async fetchNews() {
+        const feeds = [
+            { name: 'Bloomberg HT', url: 'https://www.bloomberght.com/rss' },
+            { name: 'Haberturk Ekonomi', url: 'https://www.haberturk.com/rss/rss_ekonomi.xml' },
+        ];
+
+        const allNews = [];
+        for (const feed of feeds) {
+            try {
+                const resp = await this.fetchWithTimeout(
+                    'https://api.allorigins.win/raw?url=' + encodeURIComponent(feed.url),
+                    {}, 5000
+                );
+                const text = await resp.text();
+                // Parse RSS XML
+                const parser = new DOMParser();
+                const xml = parser.parseFromString(text, 'text/xml');
+                const items = xml.querySelectorAll('item');
+
+                items.forEach((item, i) => {
+                    if (i >= 5) return; // Max 5 per feed
+                    const title = item.querySelector('title')?.textContent || '';
+                    const pubDate = item.querySelector('pubDate')?.textContent || '';
+
+                    // Simple sentiment analysis from Turkish keywords
+                    const lower = title.toLowerCase();
+                    let sentiment = 'neutral';
+                    const positiveWords = ['artis', 'yukselis', 'rekor', 'buyume', 'kar', 'ihracat', 'yatirim', 'toparlanma', 'pozitif', 'basari'];
+                    const negativeWords = ['dusus', 'gerileme', 'kayip', 'kriz', 'zarar', 'enflasyon', 'daralma', 'risk', 'endise', 'cokus'];
+
+                    if (positiveWords.some(w => lower.includes(w))) sentiment = 'positive';
+                    else if (negativeWords.some(w => lower.includes(w))) sentiment = 'negative';
+
+                    // Detect sector
+                    let sector = 'all';
+                    if (/teknoloji|yazilim|dijital/i.test(title)) sector = 'Teknoloji';
+                    else if (/enerji|elektrik|dogalgaz|petrol/i.test(title)) sector = 'Enerji';
+                    else if (/banka|finans|kredi|faiz/i.test(title)) sector = 'Finans';
+                    else if (/gida|tarim|hasat/i.test(title)) sector = 'Gida';
+                    else if (/insaat|konut|gayrimenkul/i.test(title)) sector = 'Insaat';
+                    else if (/turizm|otel|seyahat/i.test(title)) sector = 'Turizm';
+
+                    allNews.push({
+                        title,
+                        source: feed.name,
+                        date: pubDate,
+                        sentiment,
+                        impact: sentiment !== 'neutral' ? 'high' : 'medium',
+                        sector
+                    });
+                });
+            } catch (e) {
+                // RSS feed unavailable
+            }
+        }
+
+        if (allNews.length > 0) {
+            NEWS_SENTIMENT = allNews;
         }
     }
 

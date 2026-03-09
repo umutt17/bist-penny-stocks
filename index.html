@@ -53,6 +53,9 @@
                 <a href="#watchlist" class="nav-link" data-section="watchlist">
                     <i class="fas fa-star"></i> İzleme
                 </a>
+                <a href="#projection" class="nav-link" data-section="projection">
+                    <i class="fas fa-crosshairs"></i> Projeksiyon
+                </a>
             </nav>
             <div class="header-actions">
                 <button id="theme-toggle" class="icon-btn" title="Tema Değiştir">
@@ -81,6 +84,9 @@
         </a>
         <a href="#watchlist" class="mobile-link" data-section="watchlist">
             <i class="fas fa-star"></i> İzleme Listesi
+        </a>
+        <a href="#projection" class="mobile-link" data-section="projection">
+            <i class="fas fa-crosshairs"></i> Projeksiyon
         </a>
     </div>
 
@@ -365,6 +371,141 @@
             </div>
             <div id="watchlist-grid" class="watchlist-grid">
                 <!-- Filled by JS -->
+            </div>
+        </section>
+
+        <!-- Projection Section -->
+        <section id="projection" class="section">
+            <div class="section-header">
+                <h2><i class="fas fa-crosshairs"></i> Kisa / Uzun Vade Projeksiyon</h2>
+                <p>Penny stock'larin 1-3 aylik ve 6-12 aylik yatirim potansiyeli</p>
+            </div>
+
+            <!-- Projection Summary Cards -->
+            <div class="stats-grid" style="margin-bottom: 24px;">
+                <div class="stat-card gradient-green">
+                    <div class="stat-icon"><i class="fas fa-bolt"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="short-term-count">0</span>
+                        <span class="stat-label">Kisa Vade Firsati</span>
+                    </div>
+                </div>
+                <div class="stat-card gradient-blue">
+                    <div class="stat-icon"><i class="fas fa-seedling"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="long-term-count">0</span>
+                        <span class="stat-label">Uzun Vade Firsati</span>
+                    </div>
+                </div>
+                <div class="stat-card gradient-purple">
+                    <div class="stat-icon"><i class="fas fa-gem"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="both-term-count">0</span>
+                        <span class="stat-label">Her Iki Vade</span>
+                    </div>
+                </div>
+                <div class="stat-card gradient-orange">
+                    <div class="stat-icon"><i class="fas fa-signal"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="projection-source">-</span>
+                        <span class="stat-label">Veri Kaynagi</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Short Term Table -->
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header">
+                    <h3><i class="fas fa-bolt" style="color: #10b981;"></i> Kisa Vade (1-3 Ay) En Iyi Adaylar</h3>
+                    <span class="badge" style="background: rgba(16,185,129,0.15); color: #10b981;">Momentum + Teknik</span>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Sembol</th>
+                                <th>Fiyat</th>
+                                <th>1H %</th>
+                                <th>1A %</th>
+                                <th>3A %</th>
+                                <th>Hacim</th>
+                                <th>KV Skor</th>
+                                <th>Sinyal</th>
+                                <th>Neden</th>
+                            </tr>
+                        </thead>
+                        <tbody id="short-term-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Long Term Table -->
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header">
+                    <h3><i class="fas fa-seedling" style="color: #3b82f6;"></i> Uzun Vade (6-12 Ay) En Iyi Adaylar</h3>
+                    <span class="badge" style="background: rgba(59,130,246,0.15); color: #3b82f6;">Deger + Buyume</span>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Sembol</th>
+                                <th>Fiyat</th>
+                                <th>F/K</th>
+                                <th>PD/DD</th>
+                                <th>ROE</th>
+                                <th>1Y %</th>
+                                <th>UV Skor</th>
+                                <th>Sinyal</th>
+                                <th>Neden</th>
+                            </tr>
+                        </thead>
+                        <tbody id="long-term-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Both Term Stars -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-gem" style="color: #8b5cf6;"></i> Altin Firsatlar (Her Iki Vadede Guclu)</h3>
+                    <span class="badge" style="background: rgba(139,92,246,0.15); color: #8b5cf6;">Kisa + Uzun Vade</span>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Sembol</th>
+                                <th>Fiyat</th>
+                                <th>Degisim</th>
+                                <th>KV Skor</th>
+                                <th>UV Skor</th>
+                                <th>Toplam</th>
+                                <th>KV Sinyal</th>
+                                <th>UV Sinyal</th>
+                                <th>Detay</th>
+                            </tr>
+                        </thead>
+                        <tbody id="both-term-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Real News Section -->
+            <div class="card" style="margin-top: 24px;">
+                <div class="card-header">
+                    <h3><i class="fas fa-newspaper"></i> Canli Ekonomi Haberleri</h3>
+                    <span class="badge" style="background: rgba(245,158,11,0.15); color: #f59e0b;">RSS</span>
+                </div>
+                <div id="live-news-grid" class="sentiment-grid">
+                    <!-- Filled by JS -->
+                </div>
             </div>
         </section>
     </main>
