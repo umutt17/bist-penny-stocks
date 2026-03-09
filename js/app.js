@@ -10,49 +10,55 @@ class App {
     }
 
     async init() {
-        this.showLoading();
-        await this.loadAndAnalyze();
-        this.setupEventListeners();
-        this.renderDashboard();
-        this.renderScanner();
-        this.renderWatchlist();
-        this.hideLoading();
+        try {
+            this.startLoadingAnimation();
+            await this.loadAndAnalyze();
+            this.setupEventListeners();
+            this.renderDashboard();
+            this.runScanner();
+            this.renderWatchlist();
 
-        if (!this.isDark) {
-            document.documentElement.setAttribute('data-theme', 'light');
-            document.getElementById('theme-toggle').innerHTML = '<i class="fas fa-sun"></i>';
+            if (!this.isDark) {
+                document.documentElement.setAttribute('data-theme', 'light');
+                document.getElementById('theme-toggle').innerHTML = '<i class="fas fa-sun"></i>';
+            }
+        } catch (e) {
+            console.error('Init error:', e);
+        } finally {
+            this.hideLoading();
         }
     }
 
     // ===== Loading =====
-    async showLoading() {
+    startLoadingAnimation() {
         const messages = [
             'Yapay zeka modeli yükleniyor...',
             'BIST verileri analiz ediliyor...',
             'Teknik göstergeler hesaplanıyor...',
-            'Temel analiz yapılıyor...',
-            'Momentum hesaplanıyor...',
-            'Duyarlılık analizi çalışıyor...',
-            'Risk değerlendirmesi yapılıyor...',
             'Penny stock fırsatları taranıyor...',
-            'AI skorları hesaplanıyor...',
             'Sonuçlar hazırlanıyor...'
         ];
 
         const statusEl = document.getElementById('loading-status');
         const progressEl = document.getElementById('progress-fill');
+        let i = 0;
 
-        for (let i = 0; i < messages.length; i++) {
-            statusEl.textContent = messages[i];
-            progressEl.style.width = ((i + 1) / messages.length * 100) + '%';
-            await new Promise(r => setTimeout(r, 200));
-        }
+        this._loadingInterval = setInterval(() => {
+            if (i < messages.length) {
+                statusEl.textContent = messages[i];
+                progressEl.style.width = ((i + 1) / messages.length * 100) + '%';
+                i++;
+            }
+        }, 150);
     }
 
     hideLoading() {
+        if (this._loadingInterval) clearInterval(this._loadingInterval);
+        const progressEl = document.getElementById('progress-fill');
+        if (progressEl) progressEl.style.width = '100%';
         setTimeout(() => {
             document.getElementById('loading-screen').classList.add('hidden');
-        }, 300);
+        }, 200);
     }
 
     // ===== Data Loading =====
@@ -182,7 +188,7 @@ class App {
         btn.querySelector('i').classList.add('fa-spin');
         await this.loadAndAnalyze();
         this.renderDashboard();
-        this.renderScanner();
+        this.runScanner();
         setTimeout(() => btn.querySelector('i').classList.remove('fa-spin'), 1000);
         this.showToast('Veriler güncellendi', 'success');
     }
