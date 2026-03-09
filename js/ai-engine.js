@@ -85,74 +85,97 @@ class AIEngine {
         let score = 50;
         const signals = [];
         const indicators = {};
+        const tv = stock._tvIndicators || null; // Real TradingView indicators
 
         // Generate synthetic OHLCV if not provided
         const data = ohlcv || this.generateSyntheticOHLCV(stock);
 
         // ── MOMENTUM INDICATORS ──
-        // RSI (14)
-        const rsi = this.calculateRSI(data);
-        indicators.rsi = rsi;
+        // RSI (14) - use TradingView real RSI if available
+        const rsi = tv?.rsi ?? this.calculateRSI(data);
+        indicators.rsi = Math.round(rsi * 100) / 100;
         if (rsi < 30) { score += 18; signals.push('RSI aşırı satım (<30) — güçlü alım sinyali'); }
         else if (rsi < 40) { score += 10; signals.push('RSI düşük bölge — potansiyel toparlanma'); }
         else if (rsi > 70) { score -= 12; signals.push('RSI aşırı alım (>70) — düzeltme riski'); }
         else if (rsi > 60) { score -= 4; }
 
-        // Stochastic K/D
-        const stoch = this.calculateStochastic(data);
+        // Stochastic K/D - use TradingView real values if available
+        const stoch = tv ? { k: tv.stochK, d: tv.stochD } : this.calculateStochastic(data);
         indicators.stochastic = stoch;
         if (stoch.k < 20 && stoch.k > stoch.d) { score += 10; signals.push('Stokastik aşırı satım + yukarı çapraz'); }
         else if (stoch.k > 80 && stoch.k < stoch.d) { score -= 8; signals.push('Stokastik aşırı alım + aşağı çapraz'); }
 
-        // Williams %R
-        const willR = this.calculateWilliamsR(data);
-        indicators.williamsR = willR;
+        // Williams %R - use TV data if available
+        const willR = tv?.williamsR ?? this.calculateWilliamsR(data);
+        indicators.williamsR = Math.round(willR * 100) / 100;
         if (willR < -80) { score += 6; }
         else if (willR > -20) { score -= 5; }
 
         // CCI (Commodity Channel Index)
-        const cci = this.calculateCCI(data);
-        indicators.cci = cci;
+        const cci = tv?.cci ?? this.calculateCCI(data);
+        indicators.cci = Math.round(cci * 100) / 100;
         if (cci < -100) { score += 8; signals.push('CCI aşırı satım sinyali'); }
         else if (cci > 100) { score -= 6; }
 
-        // ROC (Rate of Change)
-        const roc = this.calculateROC(data);
-        indicators.roc = roc;
+        // ROC (Rate of Change) / Momentum
+        const roc = tv?.momentum != null ? tv.momentum : this.calculateROC(data);
+        indicators.roc = Math.round(roc * 100) / 100;
         if (roc > 5) { score += 6; }
         else if (roc < -5) { score -= 6; }
 
-        // MFI (Money Flow Index)
+        // MFI (Money Flow Index) - no TV equivalent, calculate from data
         const mfi = this.calculateMFI(data);
         indicators.mfi = mfi;
         if (mfi < 20) { score += 8; signals.push('MFI aşırı satım — para girişi bekleniyor'); }
         else if (mfi > 80) { score -= 6; }
 
         // ── TREND INDICATORS ──
-        // MACD
-        const macd = this.calculateMACD(data);
+        // MACD - use TV real values
+        let macd;
+        if (tv?.macdVal != null && tv?.macdSignal != null) {
+            const macdBullish = tv.macdVal > tv.macdSignal;
+            macd = { value: tv.macdVal, signalLine: tv.macdSignal, signal: macdBullish ? 'bullish' : 'bearish' };
+        } else {
+            macd = this.calculateMACD(data);
+        }
         indicators.macd = macd;
         if (macd.signal === 'bullish') { score += 12; signals.push('MACD yükseliş sinyali'); }
         else if (macd.signal === 'bearish') { score -= 10; signals.push('MACD düşüş sinyali'); }
 
-        // Moving Averages (SMA 20/50/200, EMA 20/50)
-        const ma = this.calculateMovingAverages(data);
+        // Moving Averages - use TV real SMA/EMA values
+        let ma;
+        if (tv?.sma50 && tv?.sma200 && tv?.ema20) {
+            const aboveSMA20 = stock.price > tv.ema20;
+            const aboveSMA50 = stock.price > tv.sma50;
+            const aboveSMA200 = stock.price > tv.sma200;
+            // Golden cross: SMA50 > SMA200
+            const goldenCross = tv.sma50 > tv.sma200 && aboveSMA50;
+            const deathCross = tv.sma50 < tv.sma200 && !aboveSMA50;
+            ma = { sma20: tv.ema20, sma50: tv.sma50, sma200: tv.sma200, ema20: tv.ema20, ema50: tv.ema50, aboveSMA20, aboveSMA50, aboveSMA200, goldenCross, deathCross };
+        } else {
+            ma = this.calculateMovingAverages(data);
+        }
         indicators.ma = ma;
-        if (ma.goldenCross) { score += 15; signals.push('⭐ Altın Çapraz (Golden Cross) tespit edildi'); }
-        if (ma.deathCross) { score -= 15; signals.push('☠️ Ölüm Çaprazı (Death Cross) tespit edildi'); }
+        if (ma.goldenCross) { score += 15; signals.push('Altin Capraz (Golden Cross) tespit edildi'); }
+        if (ma.deathCross) { score -= 15; signals.push('Olum Caprazi (Death Cross) tespit edildi'); }
         if (ma.aboveSMA20 && ma.aboveSMA50) { score += 8; }
         else if (!ma.aboveSMA20 && !ma.aboveSMA50) { score -= 6; }
 
-        // ADX (Average Directional Index)
-        const adx = this.calculateADX(data);
+        // ADX (Average Directional Index) - use TV real value
+        let adx;
+        if (tv?.adxVal != null) {
+            adx = { value: tv.adxVal, diPlus: tv.adxDIPlus, diMinus: tv.adxDIMinus };
+        } else {
+            adx = this.calculateADX(data);
+        }
         indicators.adx = adx;
-        if (adx.value > 25 && stock.change > 0) { score += 6; signals.push(`ADX ${adx.value.toFixed(0)} — güçlü yükseliş trendi`); }
+        if (adx.value > 25 && stock.change > 0) { score += 6; signals.push(`ADX ${adx.value.toFixed(0)} — guclu yukselis trendi`); }
         else if (adx.value > 25 && stock.change < 0) { score -= 5; }
 
         // Ichimoku Cloud
         const ichimoku = this.calculateIchimoku(data);
         indicators.ichimoku = ichimoku;
-        if (ichimoku.aboveCloud) { score += 8; signals.push('Fiyat Ichimoku bulutunun üzerinde'); }
+        if (ichimoku.aboveCloud) { score += 8; signals.push('Fiyat Ichimoku bulutunun uzerinde'); }
         else if (ichimoku.belowCloud) { score -= 6; }
 
         // Parabolic SAR
@@ -162,15 +185,22 @@ class AIEngine {
         else { score -= 4; }
 
         // ── VOLATILITY INDICATORS ──
-        // Bollinger Bands
-        const bb = this.calculateBollingerBands(data);
+        // Bollinger Bands - use TV real values
+        let bb;
+        if (tv?.bbUpper && tv?.bbLower) {
+            const bbPos = stock.price <= tv.bbLower ? 'lower' : stock.price >= tv.bbUpper ? 'upper' : 'middle';
+            const bandwidth = (tv.bbUpper - tv.bbLower) / (tv.bbBasis || stock.price);
+            bb = { upper: tv.bbUpper, lower: tv.bbLower, basis: tv.bbBasis, position: bbPos, squeeze: bandwidth < 0.05, bandwidth };
+        } else {
+            bb = this.calculateBollingerBands(data);
+        }
         indicators.bollingerBands = bb;
-        if (bb.position === 'lower') { score += 10; signals.push('Fiyat Bollinger alt bandında — sıçrama potansiyeli'); }
+        if (bb.position === 'lower') { score += 10; signals.push('Fiyat Bollinger alt bandinda — sicrama potansiyeli'); }
         else if (bb.position === 'upper') { score -= 6; }
-        if (bb.squeeze) { signals.push('Bollinger Squeeze tespit — büyük hareket bekleniyor'); }
+        if (bb.squeeze) { signals.push('Bollinger Squeeze tespit — buyuk hareket bekleniyor'); }
 
-        // ATR (Average True Range)
-        const atr = this.calculateATR(data);
+        // ATR - use TV real value
+        const atr = tv?.atr != null ? { value: tv.atr, percent: (tv.atr / stock.price) * 100 } : this.calculateATR(data);
         indicators.atr = atr;
 
         // Keltner Channels
@@ -181,21 +211,35 @@ class AIEngine {
         // OBV (On-Balance Volume)
         const obv = this.calculateOBV(data);
         indicators.obv = obv;
-        if (obv.trend === 'rising') { score += 6; signals.push('OBV yükseliyor — akıllı para girişi'); }
+        if (obv.trend === 'rising') { score += 6; signals.push('OBV yukseliyor — akilli para girisi'); }
         else if (obv.trend === 'falling') { score -= 5; }
 
         // CMF (Chaikin Money Flow)
         const cmf = this.calculateCMF(data);
         indicators.cmf = cmf;
-        if (cmf > 0.1) { score += 6; signals.push('CMF pozitif — güçlü para girişi'); }
+        if (cmf > 0.1) { score += 6; signals.push('CMF pozitif — guclu para girisi'); }
         else if (cmf < -0.1) { score -= 5; }
 
         // Volume Ratio
         const volRatio = stock.volume / Math.max(1, stock.avgVolume);
         indicators.volumeRatio = Math.round(volRatio * 100) / 100;
-        if (volRatio > 2 && stock.change > 0) { score += 12; signals.push(`Hacim ${volRatio.toFixed(1)}x ortalama — kuvvetli alım`); }
+        if (volRatio > 2 && stock.change > 0) { score += 12; signals.push(`Hacim ${volRatio.toFixed(1)}x ortalama — kuvvetli alim`); }
         else if (volRatio > 1.5 && stock.change > 0) { score += 6; }
         else if (volRatio > 2 && stock.change < 0) { score -= 8; }
+
+        // ── TRADINGVIEW RECOMMENDATIONS ──
+        if (tv?.recAll != null) {
+            indicators.tvRecommendation = tv.recAll;
+            if (tv.recAll > 0.3) { score += 8; signals.push(`TradingView: GUCLU AL (${tv.recAll.toFixed(2)})`); }
+            else if (tv.recAll > 0.1) { score += 4; signals.push(`TradingView: AL (${tv.recAll.toFixed(2)})`); }
+            else if (tv.recAll < -0.3) { score -= 8; signals.push(`TradingView: GUCLU SAT (${tv.recAll.toFixed(2)})`); }
+            else if (tv.recAll < -0.1) { score -= 4; signals.push(`TradingView: SAT (${tv.recAll.toFixed(2)})`); }
+        }
+
+        // ── PERFORMANCE METRICS ──
+        if (tv?.perfW != null) {
+            indicators.performance = { week: tv.perfW, month: tv.perf1M, month3: tv.perf3M, month6: tv.perf6M, year: tv.perfY, ytd: tv.perfYTD };
+        }
 
         return {
             score: Math.min(100, Math.max(0, score)),

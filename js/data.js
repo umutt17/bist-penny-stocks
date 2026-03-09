@@ -143,19 +143,24 @@ const NEWS_SENTIMENT = [
     { title: "Yabancı yatırımcı BIST'e geri dönüyor", sentiment: "positive", impact: "high", sector: "all" }
 ];
 
-// ===== Multi-Strategy Data Fetcher =====
+// ===== BIST Data Fetcher (TradingView Scanner API - same as bist-agent) =====
 class BISTDataFetcher {
     constructor() {
         this.isLive = false;
         this.dataSource = 'static';
+        this.corsProxies = [
+            'https://api.allorigins.win/raw?url=',
+            'https://corsproxy.io/?',
+            'https://api.codetabs.com/v1/proxy?quest=',
+        ];
     }
 
     // Fetch with timeout helper
-    async fetchWithTimeout(url, timeoutMs = 5000) {
+    async fetchWithTimeout(url, options = {}, timeoutMs = 6000) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
         try {
-            const response = await fetch(url, { signal: controller.signal });
+            const response = await fetch(url, { ...options, signal: controller.signal });
             clearTimeout(timeoutId);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             return response;
@@ -165,68 +170,187 @@ class BISTDataFetcher {
         }
     }
 
-    // Strategy 1: Yahoo Finance v8 chart API (per-symbol, but reliable)
-    async fetchViaYahooV8(symbol) {
-        const proxies = [
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=3mo&interval=1d`)}`,
-            `https://corsproxy.io/?${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=3mo&interval=1d`)}`,
-        ];
+    // ===== STRATEGY 1: TradingView Scanner API (from bist-agent) =====
+    // This is the PRIMARY method - single POST request returns ALL BIST stocks
+    async fetchViaTradingView() {
+        const tvUrl = 'https://scanner.tradingview.com/turkey/scan';
+        const payload = {
+            columns: [
+                'name', 'description', 'close', 'change', 'change_abs',
+                'volume', 'market_cap_basic', 'price_earnings_ttm',
+                'price_book_ratio', 'dividend_yield_recent',
+                'High.All', 'Low.All', 'high', 'low',
+                'price_52_week_high', 'price_52_week_low',
+                'SMA50', 'SMA200', 'EMA20', 'EMA50',
+                'RSI', 'RSI[1]', 'Stoch.K', 'Stoch.D',
+                'MACD.macd', 'MACD.signal', 'ADX', 'ADX-DI', 'ADX+DI',
+                'BB.upper', 'BB.lower', 'BB.basis',
+                'average_volume_30d_calc', 'Volatility.D',
+                'beta_1_year', 'Perf.W', 'Perf.1M', 'Perf.3M', 'Perf.6M', 'Perf.Y',
+                'Recommend.All', 'Recommend.MA', 'Recommend.Other',
+                'open', 'Perf.YTD', 'return_on_equity',
+                'debt_to_equity', 'current_ratio',
+                'ATR', 'CCI20', 'Mom', 'AO',
+                'Stoch.RSI.K', 'W.R', 'average_volume_10d_calc'
+            ],
+            range: [0, 1000],
+            sort: { sortBy: 'market_cap_basic', sortOrder: 'desc' },
+            options: { lang: 'tr' }
+        };
 
-        for (const proxyUrl of proxies) {
+        // Try direct POST first (TradingView might allow CORS)
+        try {
+            const resp = await this.fetchWithTimeout(tvUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+                body: JSON.stringify(payload)
+            }, 8000);
+            const data = await resp.json();
+            if (data?.data?.length > 0) return data;
+        } catch (e) {
+            console.log('TradingView direct failed, trying proxies...');
+        }
+
+        // Try via CORS proxies with POST body
+        for (const proxy of this.corsProxies) {
             try {
-                const resp = await this.fetchWithTimeout(proxyUrl, 4000);
+                // allorigins supports raw proxy
+                const proxyUrl = proxy + encodeURIComponent(tvUrl);
+                const resp = await this.fetchWithTimeout(proxyUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }, 8000);
+                const data = await resp.json();
+                if (data?.data?.length > 0) return data;
+            } catch (e) {
+                continue;
+            }
+        }
+
+        // Last resort: Use allorigins GET with encoded POST body in URL
+        try {
+            const allOriginsUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(tvUrl)}`;
+            const resp = await this.fetchWithTimeout(allOriginsUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }, 8000);
+            const wrapper = await resp.json();
+            if (wrapper?.contents) {
+                const data = JSON.parse(wrapper.contents);
+                if (data?.data?.length > 0) return data;
+            }
+        } catch (e) {
+            // ignore
+        }
+
+        return null;
+    }
+
+    // Convert TradingView scan result to stock format
+    tvToStock(row) {
+        const d = row.d; // data array matching columns order
+        const symbol = (row.s || '').replace('BIST:', '');
+        if (!symbol) return null;
+
+        const price = d[2] || 0;   // close
+        if (price <= 0) return null;
+
+        const change = d[3] || 0;  // change %
+        const volume = d[5] || 0;
+        const marketCap = d[6] || 0;
+        const pe = d[7] || 0;
+        const pb = d[8] || 0;
+        const dividendYield = d[9] || 0;
+        const week52High = d[14] || price * 1.3;
+        const week52Low = d[15] || price * 0.7;
+        const sma50 = d[16] || price;
+        const sma200 = d[17] || price;
+        const ema20 = d[18] || price;
+        const ema50 = d[19] || price;
+        const rsi = d[20] || 50;
+        const rsiPrev = d[21] || rsi;
+        const stochK = d[22] || 50;
+        const stochD = d[23] || 50;
+        const macdVal = d[24] || 0;
+        const macdSignal = d[25] || 0;
+        const adxVal = d[26] || 20;
+        const adxDIMinus = d[27] || 20;
+        const adxDIPlus = d[28] || 20;
+        const bbUpper = d[29] || price * 1.05;
+        const bbLower = d[30] || price * 0.95;
+        const bbBasis = d[31] || price;
+        const avgVolume = d[32] || volume || 1;
+        const volatility = d[33] || 3;
+        const beta = d[34] || 1.2;
+        const perfW = d[35] || 0;
+        const perf1M = d[36] || 0;
+        const perf3M = d[37] || 0;
+        const perf6M = d[38] || 0;
+        const perfY = d[39] || 0;
+        const recAll = d[40] || 0;    // -1 to +1 (sell to buy)
+        const recMA = d[41] || 0;
+        const recOther = d[42] || 0;
+        const open = d[43] || price;
+        const perfYTD = d[44] || 0;
+        const roe = d[45] || 0;       // return_on_equity
+        const debtToEquity = d[46] || 0;
+        const currentRatio = d[47] || 0;
+        const atr = d[48] || 0;
+        const cci = d[49] || 0;
+        const momentum = d[50] || 0;
+        const ao = d[51] || 0;        // awesome oscillator
+        const stochRsiK = d[52] || 50;
+        const williamsR = d[53] || -50;
+        const avgVolume10 = d[54] || avgVolume;
+
+        return {
+            symbol,
+            name: COMPANY_NAMES[symbol] || d[1] || symbol,
+            sector: SECTOR_MAP[symbol] || 'Diger',
+            price,
+            change: Math.round(change * 100) / 100,
+            volume,
+            marketCap,
+            pe: Math.round((pe || 0) * 100) / 100,
+            pb: Math.round((pb || 0) * 100) / 100,
+            roe: Math.round((roe || 0) * 100) / 100,
+            debt: debtToEquity > 0 ? Math.min(100, Math.round(debtToEquity / (1 + debtToEquity) * 100)) : 40,
+            beta: Math.round((beta || 1.2) * 100) / 100,
+            float: 55,
+            week52High,
+            week52Low,
+            avgVolume: Math.round(avgVolume),
+            dividend: Math.round((dividendYield || 0) * 100) / 100,
+            ma50: sma50,
+            ma200: sma200,
+            // Attach real TradingView indicators for AI engine
+            _tvIndicators: {
+                ema20, ema50, sma50, sma200,
+                rsi, rsiPrev, stochK, stochD,
+                macdVal, macdSignal,
+                adxVal, adxDIPlus, adxDIMinus,
+                bbUpper, bbLower, bbBasis,
+                volatility, atr, cci, momentum, ao,
+                stochRsiK, williamsR,
+                perfW, perf1M, perf3M, perf6M, perfY, perfYTD,
+                recAll, recMA, recOther,
+                avgVolume10, currentRatio, debtToEquity,
+                open
+            }
+        };
+    }
+
+    // ===== STRATEGY 2: Yahoo Finance v8 chart API (per-symbol with OHLCV) =====
+    async fetchViaYahooV8(symbol) {
+        for (const proxy of this.corsProxies) {
+            try {
+                const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=3mo&interval=1d`;
+                const resp = await this.fetchWithTimeout(proxy + encodeURIComponent(url), {}, 5000);
                 const json = await resp.json();
                 const result = json?.chart?.result?.[0];
-                if (result && result.meta) return result;
-            } catch (e) {
-                continue;
-            }
-        }
-        return null;
-    }
-
-    // Strategy 2: Yahoo Finance v7 quote API (batch, but may need crumb)
-    async fetchViaYahooV7(symbols) {
-        const symbolStr = symbols.join(',');
-        const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbolStr}&fields=symbol,shortName,longName,regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,averageDailyVolume3Month,marketCap,trailingPE,priceToBook,fiftyTwoWeekHigh,fiftyTwoWeekLow,fiftyDayAverage,twoHundredDayAverage,trailingAnnualDividendYield,beta`;
-
-        const proxies = [
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-            `https://corsproxy.io/?${encodeURIComponent(url)}`,
-            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-        ];
-
-        for (const proxyUrl of proxies) {
-            try {
-                const resp = await this.fetchWithTimeout(proxyUrl, 5000);
-                const data = await resp.json();
-                if (data?.quoteResponse?.result?.length > 0) {
-                    return data.quoteResponse.result;
-                }
-            } catch (e) {
-                continue;
-            }
-        }
-        return null;
-    }
-
-    // Strategy 3: Yahoo Finance v6 quote API (alternative endpoint)
-    async fetchViaYahooV6(symbols) {
-        const symbolStr = symbols.join(',');
-        const url = `https://query2.finance.yahoo.com/v6/finance/quote?symbols=${symbolStr}`;
-
-        const proxies = [
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-            `https://corsproxy.io/?${encodeURIComponent(url)}`,
-        ];
-
-        for (const proxyUrl of proxies) {
-            try {
-                const resp = await this.fetchWithTimeout(proxyUrl, 5000);
-                const data = await resp.json();
-                if (data?.quoteResponse?.result?.length > 0) {
-                    return data.quoteResponse.result;
-                }
+                if (result?.meta) return result;
             } catch (e) {
                 continue;
             }
@@ -242,7 +366,6 @@ class BISTDataFetcher {
         const quotes = result.indicators?.quote?.[0] || {};
         const timestamps = result.timestamp || [];
 
-        // Extract OHLCV data for technical analysis
         const ohlcv = [];
         for (let i = 0; i < timestamps.length; i++) {
             if (quotes.close?.[i] != null) {
@@ -256,7 +379,6 @@ class BISTDataFetcher {
             }
         }
 
-        // Calculate 52-week high/low from data
         const closes = ohlcv.map(d => d.close).filter(c => c > 0);
         const highs = ohlcv.map(d => d.high).filter(h => h > 0);
         const lows = ohlcv.map(d => d.low).filter(l => l > 0);
@@ -264,17 +386,13 @@ class BISTDataFetcher {
         const week52High = meta.fiftyTwoWeekHigh || (highs.length > 0 ? Math.max(...highs) : price * 1.3);
         const week52Low = meta.fiftyTwoWeekLow || (lows.length > 0 ? Math.min(...lows) : price * 0.7);
 
-        // Calculate averages from data
         const recentVols = ohlcv.slice(-20).map(d => d.volume);
         const avgVol = recentVols.length > 0 ? recentVols.reduce((a, b) => a + b, 0) / recentVols.length : 1;
 
-        // SMA 50 and SMA 200
         const ma50 = closes.length >= 50
             ? closes.slice(-50).reduce((a, b) => a + b, 0) / 50
             : meta.fiftyDayAverage || price;
-        const ma200 = closes.length >= 200
-            ? closes.slice(-200).reduce((a, b) => a + b, 0) / 200
-            : meta.twoHundredDayAverage || price;
+        const ma200 = meta.twoHundredDayAverage || price;
 
         const prevClose = meta.chartPreviousClose || meta.previousClose || price;
         const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
@@ -282,15 +400,14 @@ class BISTDataFetcher {
         return {
             symbol,
             name: COMPANY_NAMES[symbol] || symbol,
-            sector: SECTOR_MAP[symbol] || 'Diğer',
+            sector: SECTOR_MAP[symbol] || 'Diger',
             price,
             change: Math.round(change * 100) / 100,
             volume: ohlcv.length > 0 ? ohlcv[ohlcv.length - 1].volume : 0,
             marketCap: meta.marketCap || 0,
             pe: meta.trailingPE || 0,
             pb: meta.priceToBook || 0,
-            roe: (meta.trailingPE > 0 && meta.priceToBook > 0)
-                ? Math.round((meta.priceToBook / meta.trailingPE) * 100 * 10) / 10 : 0,
+            roe: 0,
             debt: 40,
             beta: meta.beta || 1.2,
             float: 55,
@@ -300,86 +417,74 @@ class BISTDataFetcher {
             dividend: 0,
             ma50: Math.round(ma50 * 100) / 100,
             ma200: Math.round(ma200 * 100) / 100,
-            _ohlcv: ohlcv // Attach real OHLCV for AI engine!
+            _ohlcv: ohlcv
         };
     }
 
-    // Convert v7 quote result to stock format
-    quoteToStock(quote) {
-        const symbol = quote.symbol.replace('.IS', '');
-        const price = quote.regularMarketPrice || 0;
-        const week52High = quote.fiftyTwoWeekHigh || price * 1.3;
-        const week52Low = quote.fiftyTwoWeekLow || price * 0.7;
-
-        return {
-            symbol,
-            name: COMPANY_NAMES[symbol] || quote.shortName || quote.longName || symbol,
-            sector: SECTOR_MAP[symbol] || 'Diğer',
-            price,
-            change: quote.regularMarketChangePercent || 0,
-            volume: quote.regularMarketVolume || 0,
-            marketCap: quote.marketCap || 0,
-            pe: quote.trailingPE || 0,
-            pb: quote.priceToBook || 0,
-            roe: quote.trailingPE > 0 && quote.priceToBook > 0
-                ? Math.round((quote.priceToBook / quote.trailingPE) * 100 * 10) / 10 : 0,
-            debt: 40,
-            beta: quote.beta || 1.2,
-            float: 55,
-            week52High,
-            week52Low,
-            avgVolume: quote.averageDailyVolume3Month || quote.regularMarketVolume || 1,
-            dividend: (quote.trailingAnnualDividendYield || 0) * 100,
-            ma50: quote.fiftyDayAverage || price,
-            ma200: quote.twoHundredDayAverage || price,
-        };
-    }
-
-    // Fetch market data (USD/TRY, BIST100, Gold, VIX)
+    // ===== MARKET DATA =====
     async fetchMarketData() {
+        // Try TradingView for market data too
         try {
-            // Try v7 batch first for market indicators
-            const symbols = ['USDTRY=X', 'EURTRY=X', 'XU100.IS', 'GC=F', '^VIX'];
-            const results = await this.fetchViaYahooV7(symbols);
-            if (results) {
-                results.forEach(q => {
-                    if (q.symbol === 'USDTRY=X') {
-                        MARKET_FACTORS.usdTry.value = q.regularMarketPrice || 0;
-                        MARKET_FACTORS.usdTry.change = q.regularMarketChangePercent || 0;
-                    } else if (q.symbol === 'EURTRY=X') {
-                        MARKET_FACTORS.eurTry.value = q.regularMarketPrice || 0;
-                        MARKET_FACTORS.eurTry.change = q.regularMarketChangePercent || 0;
-                    } else if (q.symbol === 'XU100.IS') {
-                        MARKET_FACTORS.bist100.value = q.regularMarketPrice || 0;
-                        MARKET_FACTORS.bist100.change = q.regularMarketChangePercent || 0;
-                    } else if (q.symbol === 'GC=F') {
-                        const goldUsd = q.regularMarketPrice || 0;
-                        MARKET_FACTORS.goldTry.value = Math.round(goldUsd * (MARKET_FACTORS.usdTry.value || 38) / 31.1035);
-                        MARKET_FACTORS.goldTry.change = q.regularMarketChangePercent || 0;
-                    } else if (q.symbol === '^VIX') {
-                        MARKET_FACTORS.vix.value = q.regularMarketPrice || 0;
-                        MARKET_FACTORS.vix.change = q.regularMarketChangePercent || 0;
-                    }
-                });
-                return true;
-            }
+            const tvUrl = 'https://scanner.tradingview.com/forex/scan';
+            const payload = {
+                columns: ['name', 'close', 'change'],
+                symbols: { tickers: ['FX_IDC:USDTRY', 'FX_IDC:EURTRY'] },
+                sort: { sortBy: 'name', sortOrder: 'asc' }
+            };
 
-            // Fallback: fetch key market data via v8 chart
-            const marketSymbols = { 'USDTRY=X': 'usdTry', 'XU100.IS': 'bist100' };
-            for (const [sym, key] of Object.entries(marketSymbols)) {
-                const result = await this.fetchViaYahooV8(sym);
-                if (result?.meta) {
-                    MARKET_FACTORS[key].value = result.meta.regularMarketPrice || 0;
-                    MARKET_FACTORS[key].change = result.meta.regularMarketDayHigh && result.meta.chartPreviousClose
-                        ? ((result.meta.regularMarketPrice - result.meta.chartPreviousClose) / result.meta.chartPreviousClose * 100) : 0;
+            // Direct
+            try {
+                const resp = await this.fetchWithTimeout(tvUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }, 5000);
+                const data = await resp.json();
+                if (data?.data) {
+                    data.data.forEach(row => {
+                        if (row.s?.includes('USDTRY')) {
+                            MARKET_FACTORS.usdTry.value = row.d[1] || 0;
+                            MARKET_FACTORS.usdTry.change = row.d[2] || 0;
+                        } else if (row.s?.includes('EURTRY')) {
+                            MARKET_FACTORS.eurTry.value = row.d[1] || 0;
+                            MARKET_FACTORS.eurTry.change = row.d[2] || 0;
+                        }
+                    });
                 }
-            }
+            } catch (e) { /* ignore */ }
+
+            // BIST100 and VIX from index scanner
+            const idxPayload = {
+                columns: ['name', 'close', 'change'],
+                symbols: { tickers: ['BIST:XU100', 'TVC:VIX'] },
+                sort: { sortBy: 'name', sortOrder: 'asc' }
+            };
+            try {
+                const resp = await this.fetchWithTimeout('https://scanner.tradingview.com/global/scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(idxPayload)
+                }, 5000);
+                const data = await resp.json();
+                if (data?.data) {
+                    data.data.forEach(row => {
+                        if (row.s?.includes('XU100')) {
+                            MARKET_FACTORS.bist100.value = row.d[1] || 0;
+                            MARKET_FACTORS.bist100.change = row.d[2] || 0;
+                        } else if (row.s?.includes('VIX')) {
+                            MARKET_FACTORS.vix.value = row.d[1] || 0;
+                            MARKET_FACTORS.vix.change = row.d[2] || 0;
+                        }
+                    });
+                }
+            } catch (e) { /* ignore */ }
+
         } catch (e) {
             console.warn('Market data fetch failed:', e.message);
         }
     }
 
-    // Main fetch - try multiple strategies with global timeout
+    // ===== MAIN FETCH =====
     async fetchAllStocks() {
         const globalTimeout = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Global timeout')), 15000)
@@ -387,79 +492,52 @@ class BISTDataFetcher {
 
         try {
             const fetchJob = async () => {
-                // Fetch market data (non-blocking, best effort)
-                await this.fetchMarketData().catch(() => {});
+                // Fetch market data in parallel
+                this.fetchMarketData().catch(() => {});
 
-                let allStocks = [];
-
-                // === Strategy 1: Try v7 batch API first (fastest if it works) ===
-                console.log('📡 Strateji 1: Yahoo v7 batch API deneniyor...');
-                const batchSize = 40;
-                for (let i = 0; i < BIST_PENNY_SYMBOLS.length; i += batchSize) {
-                    const batch = BIST_PENNY_SYMBOLS.slice(i, i + batchSize);
-                    const results = await this.fetchViaYahooV7(batch);
-                    if (results) {
-                        results.forEach(q => {
-                            if (q.regularMarketPrice > 0) allStocks.push(this.quoteToStock(q));
-                        });
-                    }
-                }
-
-                if (allStocks.length > 5) {
-                    this.isLive = true;
-                    this.dataSource = 'yahoo-v7';
-                    console.log(`✅ v7 API: ${allStocks.length} hisse yüklendi`);
-                    return allStocks;
-                }
-
-                // === Strategy 2: Try v6 batch API ===
-                console.log('📡 Strateji 2: Yahoo v6 API deneniyor...');
-                allStocks = [];
-                for (let i = 0; i < BIST_PENNY_SYMBOLS.length; i += batchSize) {
-                    const batch = BIST_PENNY_SYMBOLS.slice(i, i + batchSize);
-                    const results = await this.fetchViaYahooV6(batch);
-                    if (results) {
-                        results.forEach(q => {
-                            if (q.regularMarketPrice > 0) allStocks.push(this.quoteToStock(q));
-                        });
-                    }
-                }
-
-                if (allStocks.length > 5) {
-                    this.isLive = true;
-                    this.dataSource = 'yahoo-v6';
-                    console.log(`✅ v6 API: ${allStocks.length} hisse yüklendi`);
-                    return allStocks;
-                }
-
-                // === Strategy 3: v8 chart API per symbol (slower but most reliable) ===
-                console.log('📡 Strateji 3: Yahoo v8 chart API deneniyor...');
-                allStocks = [];
-                // Only fetch a subset to avoid very long load times
-                const prioritySymbols = BIST_PENNY_SYMBOLS.slice(0, 30);
-                const promises = prioritySymbols.map(sym =>
-                    this.fetchViaYahooV8(sym)
-                        .then(result => result ? this.chartToStock(result) : null)
-                        .catch(() => null)
-                );
-
-                // Fetch 10 at a time to avoid overwhelming
-                for (let i = 0; i < promises.length; i += 10) {
-                    const batch = promises.slice(i, i + 10);
-                    const results = await Promise.all(batch);
-                    results.forEach(stock => {
+                // === Strategy 1: TradingView Scanner (from bist-agent) ===
+                console.log('📡 Strateji 1: TradingView Scanner API deneniyor...');
+                const tvData = await this.fetchViaTradingView();
+                if (tvData?.data?.length > 0) {
+                    const allStocks = [];
+                    tvData.data.forEach(row => {
+                        const stock = this.tvToStock(row);
                         if (stock && stock.price > 0) allStocks.push(stock);
                     });
+
+                    if (allStocks.length > 5) {
+                        this.isLive = true;
+                        this.dataSource = 'tradingview';
+                        console.log(`✅ TradingView: ${allStocks.length} hisse yuklendi (gercek veriler)`);
+                        return allStocks;
+                    }
+                }
+
+                // === Strategy 2: Yahoo Finance v8 chart per symbol ===
+                console.log('📡 Strateji 2: Yahoo v8 chart API deneniyor...');
+                const prioritySymbols = BIST_PENNY_SYMBOLS.slice(0, 25);
+                const allStocks = [];
+
+                // Fetch 10 at a time in parallel
+                for (let i = 0; i < prioritySymbols.length; i += 10) {
+                    const batch = prioritySymbols.slice(i, i + 10);
+                    const promises = batch.map(sym =>
+                        this.fetchViaYahooV8(sym)
+                            .then(r => r ? this.chartToStock(r) : null)
+                            .catch(() => null)
+                    );
+                    const results = await Promise.all(promises);
+                    results.forEach(s => { if (s?.price > 0) allStocks.push(s); });
                 }
 
                 if (allStocks.length > 3) {
                     this.isLive = true;
                     this.dataSource = 'yahoo-v8';
-                    console.log(`✅ v8 chart API: ${allStocks.length} hisse yüklendi (gerçek OHLCV dahil)`);
+                    console.log(`✅ Yahoo v8: ${allStocks.length} hisse yuklendi (OHLCV dahil)`);
                     return allStocks;
                 }
 
-                console.warn('⚠️ Tüm API stratejileri başarısız');
+                console.warn('⚠️ Tum API stratejileri basarisiz');
                 return [];
             };
 
