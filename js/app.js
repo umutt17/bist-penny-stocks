@@ -63,7 +63,33 @@ class App {
 
     // ===== Data Loading =====
     async loadAndAnalyze() {
-        const pennyStocks = aiEngine.filterPennyStocks(BIST_STOCKS, 10);
+        let stocks = [];
+
+        try {
+            // Try fetching live data from Yahoo Finance
+            const liveStocks = await dataFetcher.fetchAllStocks();
+            if (liveStocks && liveStocks.length > 5) {
+                stocks = liveStocks;
+                this.dataSource = 'live';
+                console.log(`✅ Canlı veri: ${stocks.length} hisse yüklendi`);
+            } else {
+                throw new Error('Insufficient live data');
+            }
+        } catch (e) {
+            console.warn('⚠️ Canlı veri alınamadı, statik veriler kullanılıyor:', e.message);
+            stocks = FALLBACK_STOCKS;
+            this.dataSource = 'static';
+            // Set fallback market data
+            if (!MARKET_FACTORS.bist100.value) {
+                MARKET_FACTORS.usdTry.value = 38.45; MARKET_FACTORS.usdTry.change = 0.32;
+                MARKET_FACTORS.eurTry.value = 41.23; MARKET_FACTORS.eurTry.change = -0.15;
+                MARKET_FACTORS.bist100.value = 10245; MARKET_FACTORS.bist100.change = 1.45;
+                MARKET_FACTORS.goldTry.value = 3120; MARKET_FACTORS.goldTry.change = 0.89;
+                MARKET_FACTORS.vix.value = 18.5; MARKET_FACTORS.vix.change = -1.2;
+            }
+        }
+
+        const pennyStocks = aiEngine.filterPennyStocks(stocks, 10);
         this.analyzedStocks = aiEngine.analyzeAll(pennyStocks);
         this.sectorData = aiEngine.analyzeSectors(this.analyzedStocks);
     }
@@ -196,7 +222,7 @@ class App {
     // ===== Dashboard Rendering =====
     renderDashboard() {
         // Stats
-        document.getElementById('total-stocks').textContent = BIST_STOCKS.length;
+        document.getElementById('total-stocks').textContent = BIST_PENNY_SYMBOLS.length;
         document.getElementById('penny-count').textContent = this.analyzedStocks.length;
         const hotPicks = this.analyzedStocks.filter(s => s.analysis.totalScore >= 75).length;
         document.getElementById('hot-picks').textContent = hotPicks;

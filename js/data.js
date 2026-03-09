@@ -1,94 +1,104 @@
-// ===== BIST Complete Stock Database =====
-// Comprehensive BIST stock data with penny stock candidates
+// ===== BIST Stock Database =====
+// Real BIST penny stock symbols with Yahoo Finance integration
 
-const BIST_STOCKS = [
-    // === Penny Stock Candidates (Fiyat < 10 TL) ===
-    { symbol: "BALAT", name: "Balatacilar Balatacılık", sector: "Sanayi", price: 1.87, change: 4.47, volume: 12500000, marketCap: 85000000, pe: 8.2, pb: 0.7, roe: 9.1, debt: 45, beta: 1.8, float: 65, week52High: 3.10, week52Low: 1.20, avgVolume: 8000000, dividend: 0 },
-    { symbol: "DAGHL", name: "Dağ Hafriyat", sector: "İnşaat", price: 2.34, change: -1.26, volume: 5200000, marketCap: 120000000, pe: 12.5, pb: 1.1, roe: 8.8, debt: 55, beta: 1.5, float: 70, week52High: 4.50, week52Low: 1.80, avgVolume: 4000000, dividend: 0 },
-    { symbol: "DENTA", name: "Dentas Ambalaj", sector: "Sanayi", price: 3.56, change: 7.23, volume: 18900000, marketCap: 250000000, pe: 6.8, pb: 0.9, roe: 13.2, debt: 30, beta: 1.3, float: 55, week52High: 5.20, week52Low: 2.10, avgVolume: 10000000, dividend: 2.1 },
-    { symbol: "DGATE", name: "D-Gate Elektronik", sector: "Teknoloji", price: 4.12, change: 2.89, volume: 9800000, marketCap: 180000000, pe: 15.3, pb: 2.1, roe: 14.5, debt: 25, beta: 1.6, float: 60, week52High: 6.80, week52Low: 2.50, avgVolume: 7000000, dividend: 0 },
-    { symbol: "EMKEL", name: "Emek Elektrik", sector: "Enerji", price: 2.78, change: -3.14, volume: 3200000, marketCap: 95000000, pe: 9.4, pb: 0.8, roe: 8.5, debt: 60, beta: 1.4, float: 72, week52High: 5.00, week52Low: 2.10, avgVolume: 3500000, dividend: 1.5 },
-    { symbol: "EPLAS", name: "Egeplast Plastik", sector: "Sanayi", price: 5.23, change: 1.56, volume: 7600000, marketCap: 310000000, pe: 7.2, pb: 1.3, roe: 18.0, debt: 20, beta: 1.1, float: 50, week52High: 7.40, week52Low: 3.80, avgVolume: 5500000, dividend: 3.2 },
-    { symbol: "ERSU", name: "Ersu Meyve", sector: "Gıda", price: 3.89, change: 5.67, volume: 14200000, marketCap: 145000000, pe: 8.9, pb: 1.0, roe: 11.2, debt: 35, beta: 1.2, float: 62, week52High: 5.60, week52Low: 2.40, avgVolume: 9000000, dividend: 2.5 },
-    { symbol: "GEDIK", name: "Gedik Yatırım", sector: "Finans", price: 1.45, change: 9.85, volume: 32000000, marketCap: 220000000, pe: 5.5, pb: 0.6, roe: 10.9, debt: 40, beta: 2.0, float: 75, week52High: 2.80, week52Low: 0.95, avgVolume: 20000000, dividend: 4.5 },
-    { symbol: "GLRYH", name: "Güler Yatırım Holding", sector: "Finans", price: 2.67, change: -0.37, volume: 4100000, marketCap: 160000000, pe: 11.2, pb: 0.9, roe: 8.0, debt: 50, beta: 1.3, float: 68, week52High: 4.20, week52Low: 2.00, avgVolume: 3800000, dividend: 1.8 },
-    { symbol: "GOODY", name: "Goodyear Lastik", sector: "Sanayi", price: 4.78, change: 2.14, volume: 6800000, marketCap: 420000000, pe: 7.8, pb: 1.2, roe: 15.4, debt: 28, beta: 1.0, float: 45, week52High: 6.90, week52Low: 3.50, avgVolume: 5000000, dividend: 3.8 },
-    { symbol: "HURGZ", name: "Hürriyet Gazetecilik", sector: "Medya", price: 1.12, change: -2.61, volume: 8900000, marketCap: 75000000, pe: -5.2, pb: 0.4, roe: -7.6, debt: 70, beta: 2.2, float: 80, week52High: 2.40, week52Low: 0.85, avgVolume: 7000000, dividend: 0 },
-    { symbol: "IZFAS", name: "İzmir Fuar", sector: "Turizm", price: 6.34, change: 3.41, volume: 4500000, marketCap: 280000000, pe: 10.5, pb: 1.5, roe: 14.3, debt: 22, beta: 1.1, float: 40, week52High: 8.20, week52Low: 4.10, avgVolume: 3200000, dividend: 2.8 },
-    { symbol: "KAPLM", name: "Kaplamin Ambalaj", sector: "Sanayi", price: 2.91, change: 6.20, volume: 11300000, marketCap: 135000000, pe: 6.4, pb: 0.8, roe: 12.5, debt: 38, beta: 1.4, float: 65, week52High: 4.80, week52Low: 1.90, avgVolume: 8500000, dividend: 1.2 },
-    { symbol: "KARTN", name: "Kartonsan", sector: "Sanayi", price: 7.89, change: 0.89, volume: 3200000, marketCap: 520000000, pe: 8.1, pb: 1.4, roe: 17.3, debt: 15, beta: 0.9, float: 35, week52High: 10.20, week52Low: 5.60, avgVolume: 2800000, dividend: 4.2 },
-    { symbol: "KATMR", name: "Katmerciler", sector: "Sanayi", price: 8.45, change: 1.23, volume: 5600000, marketCap: 680000000, pe: 9.5, pb: 1.8, roe: 19.0, debt: 32, beta: 1.2, float: 42, week52High: 12.50, week52Low: 6.20, avgVolume: 4200000, dividend: 2.0 },
-    { symbol: "KFEIN", name: "Kafein Yazılım", sector: "Teknoloji", price: 9.12, change: 4.56, volume: 8900000, marketCap: 450000000, pe: 18.5, pb: 3.2, roe: 17.3, debt: 15, beta: 1.7, float: 55, week52High: 14.80, week52Low: 6.50, avgVolume: 6500000, dividend: 0 },
-    { symbol: "KLMSN", name: "Klimasan Klima", sector: "Sanayi", price: 4.34, change: -1.82, volume: 2900000, marketCap: 195000000, pe: 7.6, pb: 1.0, roe: 13.2, debt: 42, beta: 1.1, float: 58, week52High: 6.50, week52Low: 3.20, avgVolume: 2500000, dividend: 3.5 },
-    { symbol: "KNFRT", name: "Konfrut Gıda", sector: "Gıda", price: 3.67, change: 8.55, volume: 16700000, marketCap: 175000000, pe: 6.2, pb: 0.9, roe: 14.5, debt: 28, beta: 1.3, float: 60, week52High: 5.80, week52Low: 2.30, avgVolume: 11000000, dividend: 2.8 },
-    { symbol: "KRVGD", name: "Kervan Gıda", sector: "Gıda", price: 5.89, change: 2.34, volume: 7800000, marketCap: 340000000, pe: 8.8, pb: 1.3, roe: 14.8, debt: 25, beta: 1.0, float: 48, week52High: 8.50, week52Low: 4.20, avgVolume: 5500000, dividend: 3.0 },
-    { symbol: "KUYAS", name: "Kuyumcukent Gayrimenkul", sector: "İnşaat", price: 1.98, change: 12.50, volume: 28000000, marketCap: 98000000, pe: 4.5, pb: 0.5, roe: 11.1, debt: 55, beta: 2.1, float: 78, week52High: 3.50, week52Low: 1.10, avgVolume: 18000000, dividend: 0 },
-    { symbol: "LINK", name: "Link Bilgisayar", sector: "Teknoloji", price: 6.78, change: 3.89, volume: 9200000, marketCap: 380000000, pe: 12.3, pb: 2.0, roe: 16.3, debt: 20, beta: 1.5, float: 52, week52High: 10.20, week52Low: 4.80, avgVolume: 6800000, dividend: 1.5 },
-    { symbol: "MAKTK", name: "Makina Takım", sector: "Sanayi", price: 3.23, change: -0.62, volume: 4500000, marketCap: 142000000, pe: 9.1, pb: 1.1, roe: 12.1, debt: 38, beta: 1.2, float: 62, week52High: 5.10, week52Low: 2.50, avgVolume: 3500000, dividend: 2.0 },
-    { symbol: "MEGAP", name: "Mega Polietilen", sector: "Sanayi", price: 2.45, change: 5.60, volume: 13400000, marketCap: 110000000, pe: 5.8, pb: 0.7, roe: 12.1, debt: 42, beta: 1.6, float: 70, week52High: 4.20, week52Low: 1.60, avgVolume: 9000000, dividend: 1.0 },
-    { symbol: "MERIT", name: "Merit Turizm", sector: "Turizm", price: 7.34, change: 1.78, volume: 5100000, marketCap: 420000000, pe: 9.8, pb: 1.6, roe: 16.3, debt: 30, beta: 1.3, float: 45, week52High: 11.00, week52Low: 5.20, avgVolume: 4000000, dividend: 2.5 },
-    { symbol: "MNDRS", name: "Menderes Tekstil", sector: "Tekstil", price: 2.12, change: -4.50, volume: 6700000, marketCap: 88000000, pe: 7.5, pb: 0.6, roe: 8.0, debt: 65, beta: 1.8, float: 72, week52High: 4.30, week52Low: 1.60, avgVolume: 5500000, dividend: 0 },
-    { symbol: "MNDTR", name: "Mendoba Turizm", sector: "Turizm", price: 4.56, change: 6.78, volume: 10200000, marketCap: 210000000, pe: 7.2, pb: 1.0, roe: 13.9, debt: 35, beta: 1.4, float: 58, week52High: 7.30, week52Low: 3.10, avgVolume: 7500000, dividend: 1.8 },
-    { symbol: "NTHOL", name: "Net Holding", sector: "Finans", price: 8.90, change: 0.45, volume: 4200000, marketCap: 560000000, pe: 10.2, pb: 1.5, roe: 14.7, debt: 35, beta: 1.1, float: 48, week52High: 12.80, week52Low: 6.50, avgVolume: 3500000, dividend: 2.2 },
-    { symbol: "OSMEN", name: "Osmanli Mensucat", sector: "Tekstil", price: 1.56, change: 3.31, volume: 7800000, marketCap: 65000000, pe: 6.8, pb: 0.5, roe: 7.4, debt: 58, beta: 1.9, float: 75, week52High: 3.00, week52Low: 1.05, avgVolume: 6000000, dividend: 0 },
-    { symbol: "OSTIM", name: "Ostim Endüstriyel", sector: "Sanayi", price: 5.67, change: 2.56, volume: 8900000, marketCap: 350000000, pe: 8.5, pb: 1.3, roe: 15.3, debt: 22, beta: 1.2, float: 50, week52High: 8.40, week52Low: 4.00, avgVolume: 6500000, dividend: 2.8 },
-    { symbol: "OZGYO", name: "Özak GYO", sector: "İnşaat", price: 3.45, change: 1.17, volume: 6100000, marketCap: 230000000, pe: 7.8, pb: 0.8, roe: 10.3, debt: 48, beta: 1.3, float: 63, week52High: 5.60, week52Low: 2.60, avgVolume: 4800000, dividend: 3.5 },
-    { symbol: "PARSN", name: "Parsan Makina", sector: "Sanayi", price: 6.12, change: 3.72, volume: 5400000, marketCap: 290000000, pe: 7.5, pb: 1.2, roe: 16.0, debt: 27, beta: 1.1, float: 52, week52High: 9.00, week52Low: 4.50, avgVolume: 4000000, dividend: 3.0 },
-    { symbol: "PCILT", name: "PC İletişim", sector: "Teknoloji", price: 1.78, change: 11.25, volume: 25000000, marketCap: 92000000, pe: 5.2, pb: 0.8, roe: 15.4, debt: 30, beta: 2.3, float: 72, week52High: 3.20, week52Low: 1.00, avgVolume: 16000000, dividend: 0 },
-    { symbol: "PENGD", name: "Penguen Gıda", sector: "Gıda", price: 4.23, change: -0.94, volume: 3800000, marketCap: 195000000, pe: 9.2, pb: 1.1, roe: 12.0, debt: 35, beta: 1.0, float: 55, week52High: 6.80, week52Low: 3.40, avgVolume: 3000000, dividend: 2.5 },
-    { symbol: "PINSU", name: "Pınar Su", sector: "Gıda", price: 8.56, change: 0.35, volume: 2100000, marketCap: 480000000, pe: 11.5, pb: 2.0, roe: 17.4, debt: 12, beta: 0.7, float: 30, week52High: 11.00, week52Low: 6.80, avgVolume: 1800000, dividend: 4.0 },
-    { symbol: "PKART", name: "Plastikkart", sector: "Teknoloji", price: 3.34, change: 7.40, volume: 15600000, marketCap: 165000000, pe: 6.5, pb: 1.0, roe: 15.4, debt: 22, beta: 1.5, float: 60, week52High: 5.50, week52Low: 2.10, avgVolume: 10000000, dividend: 1.5 },
-    { symbol: "PRKME", name: "Park Elektrik Madencilik", sector: "Madencilik", price: 5.90, change: 4.24, volume: 11200000, marketCap: 380000000, pe: 6.8, pb: 1.2, roe: 17.6, debt: 30, beta: 1.4, float: 55, week52High: 9.20, week52Low: 4.00, avgVolume: 8000000, dividend: 2.5 },
-    { symbol: "PRZMA", name: "Prizma Pres", sector: "Sanayi", price: 2.56, change: 6.67, volume: 9800000, marketCap: 118000000, pe: 5.9, pb: 0.7, roe: 11.9, debt: 40, beta: 1.5, float: 68, week52High: 4.30, week52Low: 1.70, avgVolume: 7000000, dividend: 1.0 },
-    { symbol: "RHEAG", name: "RHEA Girişim", sector: "Teknoloji", price: 7.45, change: 2.06, volume: 4300000, marketCap: 320000000, pe: 14.2, pb: 2.5, roe: 17.6, debt: 18, beta: 1.6, float: 50, week52High: 11.50, week52Low: 5.00, avgVolume: 3500000, dividend: 0 },
-    { symbol: "RODRG", name: "Rodrigo Tekstil", sector: "Tekstil", price: 1.34, change: -5.63, volume: 4200000, marketCap: 55000000, pe: 8.5, pb: 0.4, roe: 4.7, debt: 72, beta: 2.1, float: 80, week52High: 3.10, week52Low: 1.00, avgVolume: 3500000, dividend: 0 },
-    { symbol: "ROYAL", name: "Royal Halı", sector: "Tekstil", price: 2.89, change: 3.58, volume: 8700000, marketCap: 130000000, pe: 7.0, pb: 0.8, roe: 11.4, debt: 45, beta: 1.4, float: 65, week52High: 4.80, week52Low: 2.00, avgVolume: 6500000, dividend: 1.5 },
-    { symbol: "RYGYO", name: "Reysaş GYO", sector: "İnşaat", price: 4.67, change: 1.96, volume: 7200000, marketCap: 280000000, pe: 8.2, pb: 0.9, roe: 11.0, debt: 45, beta: 1.2, float: 58, week52High: 7.00, week52Low: 3.50, avgVolume: 5500000, dividend: 3.0 },
-    { symbol: "SAFKR", name: "Safkar Ege Elektrik", sector: "Enerji", price: 3.12, change: 5.41, volume: 10500000, marketCap: 155000000, pe: 6.5, pb: 0.8, roe: 12.3, debt: 42, beta: 1.5, float: 65, week52High: 5.20, week52Low: 2.10, avgVolume: 7500000, dividend: 2.0 },
-    { symbol: "SAMAT", name: "Saray Matbaacılık", sector: "Sanayi", price: 1.67, change: 8.44, volume: 19500000, marketCap: 78000000, pe: 4.8, pb: 0.5, roe: 10.4, debt: 50, beta: 2.0, float: 75, week52High: 3.20, week52Low: 1.05, avgVolume: 13000000, dividend: 0 },
-    { symbol: "SANEL", name: "Sanel Elektrik", sector: "Enerji", price: 6.78, change: 1.34, volume: 3400000, marketCap: 245000000, pe: 8.9, pb: 1.3, roe: 14.6, debt: 30, beta: 1.1, float: 52, week52High: 9.50, week52Low: 5.00, avgVolume: 2800000, dividend: 3.2 },
-    { symbol: "SEGYO", name: "Seker GYO", sector: "İnşaat", price: 2.23, change: 4.21, volume: 8900000, marketCap: 105000000, pe: 6.2, pb: 0.6, roe: 9.7, debt: 52, beta: 1.6, float: 70, week52High: 3.80, week52Low: 1.50, avgVolume: 6500000, dividend: 1.0 },
-    { symbol: "SELGD", name: "Selçuk Gıda", sector: "Gıda", price: 5.45, change: 2.78, volume: 6100000, marketCap: 290000000, pe: 8.5, pb: 1.2, roe: 14.1, debt: 25, beta: 1.0, float: 48, week52High: 7.80, week52Low: 4.00, avgVolume: 4500000, dividend: 3.0 },
-    { symbol: "SILVR", name: "Silverline Endüstri", sector: "Sanayi", price: 7.12, change: -0.28, volume: 2800000, marketCap: 410000000, pe: 9.3, pb: 1.5, roe: 16.1, debt: 20, beta: 1.0, float: 42, week52High: 10.00, week52Low: 5.50, avgVolume: 2400000, dividend: 3.5 },
-    { symbol: "SMART", name: "SmartIKS Teknoloji", sector: "Teknoloji", price: 8.90, change: 5.95, volume: 12300000, marketCap: 520000000, pe: 16.8, pb: 2.8, roe: 16.7, debt: 15, beta: 1.8, float: 55, week52High: 13.50, week52Low: 5.80, avgVolume: 8500000, dividend: 0 },
-    { symbol: "SRVGY", name: "Servet GYO", sector: "İnşaat", price: 1.89, change: 7.39, volume: 15800000, marketCap: 88000000, pe: 5.0, pb: 0.5, roe: 10.0, debt: 55, beta: 1.9, float: 74, week52High: 3.40, week52Low: 1.15, avgVolume: 11000000, dividend: 0 },
-    { symbol: "TEKTU", name: "Tek-Art Turizm", sector: "Turizm", price: 3.78, change: 4.70, volume: 9400000, marketCap: 180000000, pe: 7.5, pb: 1.0, roe: 13.3, debt: 38, beta: 1.4, float: 62, week52High: 6.00, week52Low: 2.50, avgVolume: 6800000, dividend: 2.0 },
-    { symbol: "TLMAN", name: "Tilman Kimya", sector: "Sanayi", price: 4.56, change: 3.17, volume: 5600000, marketCap: 210000000, pe: 7.8, pb: 1.1, roe: 14.1, debt: 28, beta: 1.2, float: 55, week52High: 7.00, week52Low: 3.30, avgVolume: 4200000, dividend: 2.5 },
-    { symbol: "TUCLK", name: "Tuğçelik Alüminyum", sector: "Madencilik", price: 6.23, change: 2.46, volume: 7800000, marketCap: 350000000, pe: 7.2, pb: 1.2, roe: 16.7, debt: 25, beta: 1.3, float: 50, week52High: 9.50, week52Low: 4.50, avgVolume: 5500000, dividend: 3.0 },
-    { symbol: "UFUK", name: "Ufuk Yatırım", sector: "Finans", price: 1.23, change: 15.89, volume: 42000000, marketCap: 72000000, pe: 3.8, pb: 0.4, roe: 10.5, debt: 48, beta: 2.5, float: 82, week52High: 2.50, week52Low: 0.72, avgVolume: 28000000, dividend: 0 },
-    { symbol: "ULUSE", name: "Ulusoy Elektrik", sector: "Enerji", price: 3.45, change: 2.68, volume: 8900000, marketCap: 185000000, pe: 7.0, pb: 0.9, roe: 12.9, debt: 35, beta: 1.3, float: 60, week52High: 5.40, week52Low: 2.50, avgVolume: 6500000, dividend: 2.2 },
-    { symbol: "ULUUN", name: "Ulusoy Un", sector: "Gıda", price: 7.89, change: 0.76, volume: 3200000, marketCap: 430000000, pe: 9.8, pb: 1.5, roe: 15.3, debt: 22, beta: 0.9, float: 40, week52High: 10.50, week52Low: 6.00, avgVolume: 2600000, dividend: 3.8 },
-    { symbol: "VANGD", name: "Vanet Gıda", sector: "Gıda", price: 2.34, change: 9.35, volume: 20500000, marketCap: 115000000, pe: 5.5, pb: 0.7, roe: 12.7, debt: 40, beta: 1.7, float: 70, week52High: 4.00, week52Low: 1.50, avgVolume: 14000000, dividend: 1.0 },
-    { symbol: "YAPRK", name: "Yaprak Süt", sector: "Gıda", price: 4.12, change: 3.64, volume: 7600000, marketCap: 198000000, pe: 7.5, pb: 1.0, roe: 13.3, debt: 30, beta: 1.2, float: 58, week52High: 6.50, week52Low: 3.00, avgVolume: 5500000, dividend: 2.5 },
-    { symbol: "YAYLA", name: "Yayla Enerji", sector: "Enerji", price: 5.67, change: 4.41, volume: 9800000, marketCap: 320000000, pe: 7.8, pb: 1.2, roe: 15.4, debt: 32, beta: 1.3, float: 52, week52High: 8.80, week52Low: 4.00, avgVolume: 7000000, dividend: 2.8 },
-    { symbol: "YESIL", name: "Yeşil Yatırım", sector: "Finans", price: 1.56, change: 6.85, volume: 18700000, marketCap: 82000000, pe: 4.2, pb: 0.5, roe: 11.9, debt: 45, beta: 2.2, float: 76, week52High: 3.00, week52Low: 0.90, avgVolume: 13000000, dividend: 0 },
-    { symbol: "YGYO", name: "Yeşil GYO", sector: "İnşaat", price: 2.78, change: 3.73, volume: 8400000, marketCap: 140000000, pe: 6.8, pb: 0.7, roe: 10.3, debt: 50, beta: 1.5, float: 68, week52High: 4.60, week52Low: 2.00, avgVolume: 6000000, dividend: 1.5 },
-    { symbol: "YUNSA", name: "Yünsa Yünlü", sector: "Tekstil", price: 8.34, change: 1.45, volume: 3500000, marketCap: 380000000, pe: 8.5, pb: 1.3, roe: 15.3, debt: 28, beta: 1.1, float: 45, week52High: 11.20, week52Low: 6.50, avgVolume: 2800000, dividend: 3.5 },
-    { symbol: "ZEDUR", name: "Zedur Enerji", sector: "Enerji", price: 3.90, change: 5.41, volume: 11200000, marketCap: 195000000, pe: 6.5, pb: 0.9, roe: 13.8, debt: 35, beta: 1.4, float: 60, week52High: 6.20, week52Low: 2.80, avgVolume: 8000000, dividend: 2.0 },
-    { symbol: "ARENA", name: "Arena Bilgisayar", sector: "Teknoloji", price: 9.56, change: 1.89, volume: 5600000, marketCap: 480000000, pe: 11.2, pb: 2.0, roe: 17.9, debt: 18, beta: 1.3, float: 48, week52High: 13.80, week52Low: 7.00, avgVolume: 4200000, dividend: 2.5 },
-    { symbol: "BMELK", name: "BIM Elektrik", sector: "Enerji", price: 2.12, change: 8.72, volume: 16800000, marketCap: 98000000, pe: 5.0, pb: 0.6, roe: 12.0, debt: 45, beta: 1.8, float: 72, week52High: 3.80, week52Low: 1.30, avgVolume: 11000000, dividend: 0 },
-    { symbol: "CELHA", name: "Çelik Halat", sector: "Sanayi", price: 4.89, change: 2.73, volume: 6300000, marketCap: 265000000, pe: 7.5, pb: 1.1, roe: 14.7, debt: 28, beta: 1.2, float: 55, week52High: 7.20, week52Low: 3.60, avgVolume: 4800000, dividend: 3.0 },
-    { symbol: "DARDL", name: "Dardanel Önentaş", sector: "Gıda", price: 3.56, change: 4.39, volume: 12500000, marketCap: 175000000, pe: 7.2, pb: 0.9, roe: 12.5, debt: 38, beta: 1.4, float: 63, week52High: 5.60, week52Low: 2.40, avgVolume: 8500000, dividend: 1.8 },
-    { symbol: "EDATA", name: "E-Data Teknoloji", sector: "Teknoloji", price: 1.45, change: 13.28, volume: 35000000, marketCap: 78000000, pe: 4.5, pb: 0.6, roe: 13.3, debt: 32, beta: 2.4, float: 78, week52High: 2.80, week52Low: 0.80, avgVolume: 22000000, dividend: 0 },
-    { symbol: "FONET", name: "Fonet Bilgi Teknolojileri", sector: "Teknoloji", price: 6.34, change: 3.26, volume: 8900000, marketCap: 310000000, pe: 10.5, pb: 1.8, roe: 17.1, debt: 15, beta: 1.5, float: 52, week52High: 9.80, week52Low: 4.50, avgVolume: 6200000, dividend: 1.0 },
-    { symbol: "HUBVC", name: "Hub Girişim", sector: "Teknoloji", price: 8.12, change: 2.14, volume: 4500000, marketCap: 420000000, pe: 15.8, pb: 2.5, roe: 15.8, debt: 20, beta: 1.6, float: 50, week52High: 12.50, week52Low: 5.80, avgVolume: 3500000, dividend: 0 },
-    { symbol: "INTEM", name: "İntem Mağazacılık", sector: "Perakende", price: 5.78, change: 1.93, volume: 4200000, marketCap: 240000000, pe: 8.8, pb: 1.3, roe: 14.8, debt: 25, beta: 1.1, float: 55, week52High: 8.20, week52Low: 4.20, avgVolume: 3200000, dividend: 2.5 },
-    { symbol: "KRDMA", name: "Kardemir A", sector: "Madencilik", price: 3.78, change: 1.61, volume: 15200000, marketCap: 580000000, pe: 6.5, pb: 0.8, roe: 12.3, debt: 45, beta: 1.5, float: 60, week52High: 6.20, week52Low: 2.80, avgVolume: 11000000, dividend: 2.0 },
-    { symbol: "MAGEN", name: "MA Güneş Enerji", sector: "Enerji", price: 4.34, change: 6.37, volume: 13500000, marketCap: 220000000, pe: 8.0, pb: 1.2, roe: 15.0, debt: 30, beta: 1.5, float: 58, week52High: 7.00, week52Low: 3.00, avgVolume: 9500000, dividend: 1.5 },
-    { symbol: "OBASE", name: "Obase Bilgisayar", sector: "Teknoloji", price: 7.56, change: 3.42, volume: 6800000, marketCap: 340000000, pe: 12.0, pb: 2.0, roe: 16.7, debt: 15, beta: 1.5, float: 50, week52High: 11.00, week52Low: 5.20, avgVolume: 5000000, dividend: 1.0 },
-    { symbol: "TKNSA", name: "Teknosa İç ve Dış", sector: "Perakende", price: 3.12, change: 2.30, volume: 9800000, marketCap: 185000000, pe: 7.5, pb: 0.9, roe: 12.0, debt: 40, beta: 1.3, float: 60, week52High: 5.00, week52Low: 2.20, avgVolume: 7000000, dividend: 2.0 },
-    { symbol: "TURSG", name: "Türkiye Sigorta", sector: "Finans", price: 6.89, change: 1.03, volume: 8200000, marketCap: 520000000, pe: 9.5, pb: 1.4, roe: 14.7, debt: 22, beta: 1.0, float: 45, week52High: 9.50, week52Low: 5.20, avgVolume: 6000000, dividend: 3.5 },
-    { symbol: "VAKFN", name: "Vakıf Fin. Kiralama", sector: "Finans", price: 2.56, change: 4.08, volume: 11500000, marketCap: 145000000, pe: 5.8, pb: 0.6, roe: 10.3, debt: 50, beta: 1.6, float: 68, week52High: 4.20, week52Low: 1.80, avgVolume: 8500000, dividend: 1.5 },
-    { symbol: "YATAS", name: "Yataş Yatak", sector: "Sanayi", price: 9.23, change: 0.98, volume: 3500000, marketCap: 480000000, pe: 9.0, pb: 1.5, roe: 16.7, debt: 25, beta: 1.0, float: 42, week52High: 12.50, week52Low: 7.00, avgVolume: 2800000, dividend: 3.2 },
-    { symbol: "GWIND", name: "Galata Wind Enerji", sector: "Enerji", price: 7.78, change: 2.19, volume: 6200000, marketCap: 420000000, pe: 10.5, pb: 1.8, roe: 17.1, debt: 28, beta: 1.2, float: 48, week52High: 11.00, week52Low: 5.80, avgVolume: 4800000, dividend: 2.5 },
-    { symbol: "DYOBY", name: "DYO Boya", sector: "Sanayi", price: 4.67, change: 3.10, volume: 7800000, marketCap: 285000000, pe: 7.8, pb: 1.1, roe: 14.1, debt: 32, beta: 1.2, float: 55, week52High: 7.00, week52Low: 3.40, avgVolume: 5500000, dividend: 2.8 },
-    { symbol: "BRMEN", name: "Birlik Mensucat", sector: "Tekstil", price: 1.23, change: -3.15, volume: 5600000, marketCap: 48000000, pe: 9.5, pb: 0.3, roe: 3.2, debt: 75, beta: 2.3, float: 85, week52High: 2.80, week52Low: 0.90, avgVolume: 4500000, dividend: 0 },
-    { symbol: "CMENT", name: "Çimentaş", sector: "İnşaat", price: 5.34, change: 1.52, volume: 4200000, marketCap: 310000000, pe: 8.2, pb: 1.2, roe: 14.6, debt: 30, beta: 1.1, float: 50, week52High: 7.80, week52Low: 4.00, avgVolume: 3200000, dividend: 3.2 },
-    { symbol: "ERBOS", name: "Erbosan Erciyas Boru", sector: "Sanayi", price: 8.67, change: 1.17, volume: 3100000, marketCap: 440000000, pe: 8.5, pb: 1.4, roe: 16.5, debt: 22, beta: 1.0, float: 40, week52High: 11.50, week52Low: 6.50, avgVolume: 2500000, dividend: 3.8 },
-    { symbol: "FORTE", name: "Forte Bilgi İletişim", sector: "Teknoloji", price: 2.89, change: 9.47, volume: 21000000, marketCap: 135000000, pe: 5.5, pb: 0.9, roe: 16.4, debt: 22, beta: 1.9, float: 68, week52High: 5.00, week52Low: 1.60, avgVolume: 14000000, dividend: 0 },
-    { symbol: "GENIL", name: "Genişletilmiş İlaç", sector: "Sağlık", price: 4.45, change: 5.95, volume: 10200000, marketCap: 225000000, pe: 9.5, pb: 1.5, roe: 15.8, debt: 20, beta: 1.4, float: 55, week52High: 7.20, week52Low: 3.10, avgVolume: 7500000, dividend: 1.5 },
-    { symbol: "ISMEN", name: "İş Mensucat", sector: "Tekstil", price: 3.12, change: 2.30, volume: 5800000, marketCap: 142000000, pe: 7.8, pb: 0.8, roe: 10.3, debt: 45, beta: 1.4, float: 65, week52High: 5.20, week52Low: 2.30, avgVolume: 4200000, dividend: 1.8 },
+// Real BIST penny stock candidate symbols (price typically < 10 TL)
+const BIST_PENNY_SYMBOLS = [
+    // Sanayi
+    "BALAT.IS", "DENTA.IS", "EPLAS.IS", "GOODY.IS", "KAPLM.IS", "KARTN.IS",
+    "KATMR.IS", "KLMSN.IS", "MAKTK.IS", "MEGAP.IS", "PRZMA.IS", "SILVR.IS",
+    "CELHA.IS", "DYOBY.IS", "ERBOS.IS", "OSTIM.IS", "PARSN.IS", "TLMAN.IS",
+    "YATAS.IS", "SAMAT.IS",
+    // Teknoloji
+    "DGATE.IS", "LINK.IS", "KFEIN.IS", "PKART.IS", "PCILT.IS", "SMART.IS",
+    "ARENA.IS", "EDATA.IS", "FONET.IS", "HUBVC.IS", "OBASE.IS", "FORTE.IS",
+    "RHEAG.IS",
+    // Finans
+    "GEDIK.IS", "GLRYH.IS", "NTHOL.IS", "UFUK.IS", "YESIL.IS", "TURSG.IS",
+    "VAKFN.IS",
+    // Enerji
+    "EMKEL.IS", "SAFKR.IS", "SANEL.IS", "ULUSE.IS", "YAYLA.IS", "ZEDUR.IS",
+    "GWIND.IS", "BMELK.IS", "MAGEN.IS",
+    // Gıda
+    "ERSU.IS", "KNFRT.IS", "KRVGD.IS", "PENGD.IS", "PINSU.IS", "SELGD.IS",
+    "ULUUN.IS", "VANGD.IS", "YAPRK.IS", "DARDL.IS",
+    // İnşaat / GYO
+    "DAGHL.IS", "OZGYO.IS", "RYGYO.IS", "SEGYO.IS", "SRVGY.IS", "YGYO.IS",
+    "CMENT.IS", "KUYAS.IS",
+    // Tekstil
+    "MNDRS.IS", "OSMEN.IS", "RODRG.IS", "ROYAL.IS", "YUNSA.IS", "BRMEN.IS",
+    "ISMEN.IS",
+    // Madencilik
+    "PRKME.IS", "TUCLK.IS", "KRDMA.IS",
+    // Turizm
+    "IZFAS.IS", "MERIT.IS", "MNDTR.IS", "TEKTU.IS",
+    // Diğer
+    "HURGZ.IS", "INTEM.IS", "TKNSA.IS", "GENIL.IS",
 ];
+
+// Sector mapping for BIST stocks
+const SECTOR_MAP = {
+    "BALAT": "Sanayi", "DENTA": "Sanayi", "EPLAS": "Sanayi", "GOODY": "Sanayi",
+    "KAPLM": "Sanayi", "KARTN": "Sanayi", "KATMR": "Sanayi", "KLMSN": "Sanayi",
+    "MAKTK": "Sanayi", "MEGAP": "Sanayi", "PRZMA": "Sanayi", "SILVR": "Sanayi",
+    "CELHA": "Sanayi", "DYOBY": "Sanayi", "ERBOS": "Sanayi", "OSTIM": "Sanayi",
+    "PARSN": "Sanayi", "TLMAN": "Sanayi", "YATAS": "Sanayi", "SAMAT": "Sanayi",
+    "DGATE": "Teknoloji", "LINK": "Teknoloji", "KFEIN": "Teknoloji", "PKART": "Teknoloji",
+    "PCILT": "Teknoloji", "SMART": "Teknoloji", "ARENA": "Teknoloji", "EDATA": "Teknoloji",
+    "FONET": "Teknoloji", "HUBVC": "Teknoloji", "OBASE": "Teknoloji", "FORTE": "Teknoloji",
+    "RHEAG": "Teknoloji",
+    "GEDIK": "Finans", "GLRYH": "Finans", "NTHOL": "Finans", "UFUK": "Finans",
+    "YESIL": "Finans", "TURSG": "Finans", "VAKFN": "Finans",
+    "EMKEL": "Enerji", "SAFKR": "Enerji", "SANEL": "Enerji", "ULUSE": "Enerji",
+    "YAYLA": "Enerji", "ZEDUR": "Enerji", "GWIND": "Enerji", "BMELK": "Enerji",
+    "MAGEN": "Enerji",
+    "ERSU": "Gıda", "KNFRT": "Gıda", "KRVGD": "Gıda", "PENGD": "Gıda",
+    "PINSU": "Gıda", "SELGD": "Gıda", "ULUUN": "Gıda", "VANGD": "Gıda",
+    "YAPRK": "Gıda", "DARDL": "Gıda",
+    "DAGHL": "İnşaat", "OZGYO": "İnşaat", "RYGYO": "İnşaat", "SEGYO": "İnşaat",
+    "SRVGY": "İnşaat", "YGYO": "İnşaat", "CMENT": "İnşaat", "KUYAS": "İnşaat",
+    "MNDRS": "Tekstil", "OSMEN": "Tekstil", "RODRG": "Tekstil", "ROYAL": "Tekstil",
+    "YUNSA": "Tekstil", "BRMEN": "Tekstil", "ISMEN": "Tekstil",
+    "PRKME": "Madencilik", "TUCLK": "Madencilik", "KRDMA": "Madencilik",
+    "IZFAS": "Turizm", "MERIT": "Turizm", "MNDTR": "Turizm", "TEKTU": "Turizm",
+    "HURGZ": "Medya", "INTEM": "Perakende", "TKNSA": "Perakende", "GENIL": "Sağlık",
+};
+
+// Company name mapping
+const COMPANY_NAMES = {
+    "BALAT": "Balatacilar Balatacılık", "DENTA": "Dentas Ambalaj", "EPLAS": "Egeplast Plastik",
+    "GOODY": "Goodyear Lastik", "KAPLM": "Kaplamin Ambalaj", "KARTN": "Kartonsan",
+    "KATMR": "Katmerciler", "KLMSN": "Klimasan Klima", "MAKTK": "Makina Takım",
+    "MEGAP": "Mega Polietilen", "PRZMA": "Prizma Pres", "SILVR": "Silverline Endüstri",
+    "CELHA": "Çelik Halat", "DYOBY": "DYO Boya", "ERBOS": "Erbosan Erciyas Boru",
+    "OSTIM": "Ostim Endüstriyel", "PARSN": "Parsan Makina", "TLMAN": "Tilman Kimya",
+    "YATAS": "Yataş Yatak", "SAMAT": "Saray Matbaacılık",
+    "DGATE": "D-Gate Elektronik", "LINK": "Link Bilgisayar", "KFEIN": "Kafein Yazılım",
+    "PKART": "Plastikkart", "PCILT": "PC İletişim", "SMART": "SmartIKS Teknoloji",
+    "ARENA": "Arena Bilgisayar", "EDATA": "E-Data Teknoloji", "FONET": "Fonet Bilgi Teknolojileri",
+    "HUBVC": "Hub Girişim", "OBASE": "Obase Bilgisayar", "FORTE": "Forte Bilgi İletişim",
+    "RHEAG": "RHEA Girişim",
+    "GEDIK": "Gedik Yatırım", "GLRYH": "Güler Yatırım Holding", "NTHOL": "Net Holding",
+    "UFUK": "Ufuk Yatırım", "YESIL": "Yeşil Yatırım", "TURSG": "Türkiye Sigorta",
+    "VAKFN": "Vakıf Fin. Kiralama",
+    "EMKEL": "Emek Elektrik", "SAFKR": "Safkar Ege Elektrik", "SANEL": "Sanel Elektrik",
+    "ULUSE": "Ulusoy Elektrik", "YAYLA": "Yayla Enerji", "ZEDUR": "Zedur Enerji",
+    "GWIND": "Galata Wind Enerji", "BMELK": "BIM Elektrik", "MAGEN": "MA Güneş Enerji",
+    "ERSU": "Ersu Meyve", "KNFRT": "Konfrut Gıda", "KRVGD": "Kervan Gıda",
+    "PENGD": "Penguen Gıda", "PINSU": "Pınar Su", "SELGD": "Selçuk Gıda",
+    "ULUUN": "Ulusoy Un", "VANGD": "Vanet Gıda", "YAPRK": "Yaprak Süt",
+    "DARDL": "Dardanel Önentaş",
+    "DAGHL": "Dağ Hafriyat", "OZGYO": "Özak GYO", "RYGYO": "Reysaş GYO",
+    "SEGYO": "Seker GYO", "SRVGY": "Servet GYO", "YGYO": "Yeşil GYO",
+    "CMENT": "Çimentaş", "KUYAS": "Kuyumcukent Gayrimenkul",
+    "MNDRS": "Menderes Tekstil", "OSMEN": "Osmanli Mensucat", "RODRG": "Rodrigo Tekstil",
+    "ROYAL": "Royal Halı", "YUNSA": "Yünsa Yünlü", "BRMEN": "Birlik Mensucat",
+    "ISMEN": "İş Mensucat",
+    "PRKME": "Park Elektrik Madencilik", "TUCLK": "Tuğçelik Alüminyum", "KRDMA": "Kardemir A",
+    "IZFAS": "İzmir Fuar", "MERIT": "Merit Turizm", "MNDTR": "Mendoba Turizm",
+    "TEKTU": "Tek-Art Turizm",
+    "HURGZ": "Hürriyet Gazetecilik", "INTEM": "İntem Mağazacılık", "TKNSA": "Teknosa",
+    "GENIL": "Genişletilmiş İlaç",
+};
 
 // Sector color mapping
 const SECTOR_COLORS = {
@@ -109,17 +119,17 @@ const SECTOR_COLORS = {
 
 // Market factors for AI analysis
 const MARKET_FACTORS = {
-    usdTry: { value: 38.45, change: 0.32, label: "USD/TRY" },
-    eurTry: { value: 41.23, change: -0.15, label: "EUR/TRY" },
-    bist100: { value: 10245, change: 1.45, label: "BIST 100" },
-    goldTry: { value: 3120, change: 0.89, label: "Altın (TL/gr)" },
+    usdTry: { value: 0, change: 0, label: "USD/TRY" },
+    eurTry: { value: 0, change: 0, label: "EUR/TRY" },
+    bist100: { value: 0, change: 0, label: "BIST 100" },
+    goldTry: { value: 0, change: 0, label: "Altın (TL/gr)" },
     cds: { value: 285, change: -5, label: "CDS (5Y)" },
     inflation: { value: 42.5, label: "Enflasyon (%)" },
     interest: { value: 45.0, label: "Faiz Oranı (%)" },
-    vix: { value: 18.5, change: -1.2, label: "VIX" }
+    vix: { value: 0, change: 0, label: "VIX" }
 };
 
-// News/Sentiment data for analysis
+// News/Sentiment data
 const NEWS_SENTIMENT = [
     { title: "Merkez Bankası faiz kararını açıkladı", sentiment: "neutral", impact: "high", sector: "all" },
     { title: "Teknoloji sektöründe yeni yatırım dalgası", sentiment: "positive", impact: "high", sector: "Teknoloji" },
@@ -132,3 +142,187 @@ const NEWS_SENTIMENT = [
     { title: "Küresel resesyon endişeleri artıyor", sentiment: "negative", impact: "high", sector: "all" },
     { title: "Yabancı yatırımcı BIST'e geri dönüyor", sentiment: "positive", impact: "high", sector: "all" }
 ];
+
+// ===== Yahoo Finance Data Fetcher =====
+class BISTDataFetcher {
+    constructor() {
+        // Multiple CORS proxies as fallback
+        this.corsProxies = [
+            'https://api.allorigins.win/raw?url=',
+            'https://corsproxy.io/?',
+            'https://api.codetabs.com/v1/proxy?quest=',
+        ];
+        this.currentProxyIndex = 0;
+        this.isLive = false;
+    }
+
+    get proxy() {
+        return this.corsProxies[this.currentProxyIndex];
+    }
+
+    nextProxy() {
+        this.currentProxyIndex = (this.currentProxyIndex + 1) % this.corsProxies.length;
+    }
+
+    // Fetch multiple quotes from Yahoo Finance
+    async fetchQuotes(symbols) {
+        const symbolStr = symbols.join(',');
+        const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbolStr}&fields=symbol,shortName,longName,regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,averageDailyVolume3Month,marketCap,trailingPE,priceToBook,fiftyTwoWeekHigh,fiftyTwoWeekLow,fiftyDayAverage,twoHundredDayAverage,trailingAnnualDividendYield,beta`;
+
+        for (let attempt = 0; attempt < this.corsProxies.length; attempt++) {
+            try {
+                const proxyUrl = this.proxy + encodeURIComponent(url);
+                const response = await fetch(proxyUrl, {
+                    signal: AbortSignal.timeout(10000)
+                });
+
+                if (!response.ok) {
+                    this.nextProxy();
+                    continue;
+                }
+
+                const data = await response.json();
+                if (data.quoteResponse && data.quoteResponse.result) {
+                    this.isLive = true;
+                    return data.quoteResponse.result;
+                }
+                this.nextProxy();
+            } catch (e) {
+                console.warn(`Proxy ${this.currentProxyIndex} failed:`, e.message);
+                this.nextProxy();
+            }
+        }
+        return null;
+    }
+
+    // Fetch market indicators (USD/TRY, BIST100, Gold, VIX)
+    async fetchMarketData() {
+        const symbols = 'USDTRY=X,EURTRY=X,XU100.IS,GC=F,^VIX';
+        try {
+            const results = await this.fetchQuotes(symbols.split(','));
+            if (!results) return;
+
+            results.forEach(q => {
+                if (q.symbol === 'USDTRY=X') {
+                    MARKET_FACTORS.usdTry.value = q.regularMarketPrice || 0;
+                    MARKET_FACTORS.usdTry.change = q.regularMarketChangePercent || 0;
+                } else if (q.symbol === 'EURTRY=X') {
+                    MARKET_FACTORS.eurTry.value = q.regularMarketPrice || 0;
+                    MARKET_FACTORS.eurTry.change = q.regularMarketChangePercent || 0;
+                } else if (q.symbol === 'XU100.IS') {
+                    MARKET_FACTORS.bist100.value = q.regularMarketPrice || 0;
+                    MARKET_FACTORS.bist100.change = q.regularMarketChangePercent || 0;
+                } else if (q.symbol === 'GC=F') {
+                    // Gold USD price * USD/TRY / 31.1 (ons to gram)
+                    const goldUsd = q.regularMarketPrice || 0;
+                    MARKET_FACTORS.goldTry.value = Math.round(goldUsd * (MARKET_FACTORS.usdTry.value || 38) / 31.1035);
+                    MARKET_FACTORS.goldTry.change = q.regularMarketChangePercent || 0;
+                } else if (q.symbol === '^VIX') {
+                    MARKET_FACTORS.vix.value = q.regularMarketPrice || 0;
+                    MARKET_FACTORS.vix.change = q.regularMarketChangePercent || 0;
+                }
+            });
+        } catch (e) {
+            console.warn('Market data fetch failed:', e);
+        }
+    }
+
+    // Convert Yahoo Finance quote to our stock format
+    quoteToStock(quote) {
+        const symbol = quote.symbol.replace('.IS', '');
+        const price = quote.regularMarketPrice || 0;
+        const week52High = quote.fiftyTwoWeekHigh || price * 1.3;
+        const week52Low = quote.fiftyTwoWeekLow || price * 0.7;
+
+        return {
+            symbol: symbol,
+            name: COMPANY_NAMES[symbol] || quote.shortName || quote.longName || symbol,
+            sector: SECTOR_MAP[symbol] || 'Diğer',
+            price: price,
+            change: quote.regularMarketChangePercent || 0,
+            volume: quote.regularMarketVolume || 0,
+            marketCap: quote.marketCap || 0,
+            pe: quote.trailingPE || 0,
+            pb: quote.priceToBook || 0,
+            roe: quote.trailingPE > 0 && quote.priceToBook > 0
+                ? Math.round((quote.priceToBook / quote.trailingPE) * 100 * 10) / 10
+                : 0,
+            debt: 40, // Default - not available from basic quote
+            beta: quote.beta || 1.2,
+            float: 55, // Default
+            week52High: week52High,
+            week52Low: week52Low,
+            avgVolume: quote.averageDailyVolume3Month || quote.regularMarketVolume || 1,
+            dividend: (quote.trailingAnnualDividendYield || 0) * 100,
+            ma50: quote.fiftyDayAverage || price,
+            ma200: quote.twoHundredDayAverage || price,
+        };
+    }
+
+    // Main fetch - get all BIST penny stock data
+    async fetchAllStocks() {
+        // Fetch market data first
+        await this.fetchMarketData();
+
+        // Yahoo Finance supports max ~50 symbols per request, split into batches
+        const batchSize = 40;
+        const allStocks = [];
+
+        for (let i = 0; i < BIST_PENNY_SYMBOLS.length; i += batchSize) {
+            const batch = BIST_PENNY_SYMBOLS.slice(i, i + batchSize);
+            const results = await this.fetchQuotes(batch);
+
+            if (results) {
+                results.forEach(quote => {
+                    if (quote.regularMarketPrice && quote.regularMarketPrice > 0) {
+                        allStocks.push(this.quoteToStock(quote));
+                    }
+                });
+            }
+
+            // Small delay between batches
+            if (i + batchSize < BIST_PENNY_SYMBOLS.length) {
+                await new Promise(r => setTimeout(r, 300));
+            }
+        }
+
+        return allStocks;
+    }
+}
+
+// Fallback static data (used when API is unavailable)
+const FALLBACK_STOCKS = [
+    { symbol: "BALAT", name: "Balatacilar Balatacılık", sector: "Sanayi", price: 1.87, change: 4.47, volume: 12500000, marketCap: 85000000, pe: 8.2, pb: 0.7, roe: 9.1, debt: 45, beta: 1.8, float: 65, week52High: 3.10, week52Low: 1.20, avgVolume: 8000000, dividend: 0 },
+    { symbol: "DENTA", name: "Dentas Ambalaj", sector: "Sanayi", price: 3.56, change: 7.23, volume: 18900000, marketCap: 250000000, pe: 6.8, pb: 0.9, roe: 13.2, debt: 30, beta: 1.3, float: 55, week52High: 5.20, week52Low: 2.10, avgVolume: 10000000, dividend: 2.1 },
+    { symbol: "DGATE", name: "D-Gate Elektronik", sector: "Teknoloji", price: 4.12, change: 2.89, volume: 9800000, marketCap: 180000000, pe: 15.3, pb: 2.1, roe: 14.5, debt: 25, beta: 1.6, float: 60, week52High: 6.80, week52Low: 2.50, avgVolume: 7000000, dividend: 0 },
+    { symbol: "EPLAS", name: "Egeplast Plastik", sector: "Sanayi", price: 5.23, change: 1.56, volume: 7600000, marketCap: 310000000, pe: 7.2, pb: 1.3, roe: 18.0, debt: 20, beta: 1.1, float: 50, week52High: 7.40, week52Low: 3.80, avgVolume: 5500000, dividend: 3.2 },
+    { symbol: "ERSU", name: "Ersu Meyve", sector: "Gıda", price: 3.89, change: 5.67, volume: 14200000, marketCap: 145000000, pe: 8.9, pb: 1.0, roe: 11.2, debt: 35, beta: 1.2, float: 62, week52High: 5.60, week52Low: 2.40, avgVolume: 9000000, dividend: 2.5 },
+    { symbol: "GEDIK", name: "Gedik Yatırım", sector: "Finans", price: 1.45, change: 9.85, volume: 32000000, marketCap: 220000000, pe: 5.5, pb: 0.6, roe: 10.9, debt: 40, beta: 2.0, float: 75, week52High: 2.80, week52Low: 0.95, avgVolume: 20000000, dividend: 4.5 },
+    { symbol: "GOODY", name: "Goodyear Lastik", sector: "Sanayi", price: 4.78, change: 2.14, volume: 6800000, marketCap: 420000000, pe: 7.8, pb: 1.2, roe: 15.4, debt: 28, beta: 1.0, float: 45, week52High: 6.90, week52Low: 3.50, avgVolume: 5000000, dividend: 3.8 },
+    { symbol: "KAPLM", name: "Kaplamin Ambalaj", sector: "Sanayi", price: 2.91, change: 6.20, volume: 11300000, marketCap: 135000000, pe: 6.4, pb: 0.8, roe: 12.5, debt: 38, beta: 1.4, float: 65, week52High: 4.80, week52Low: 1.90, avgVolume: 8500000, dividend: 1.2 },
+    { symbol: "KATMR", name: "Katmerciler", sector: "Sanayi", price: 8.45, change: 1.23, volume: 5600000, marketCap: 680000000, pe: 9.5, pb: 1.8, roe: 19.0, debt: 32, beta: 1.2, float: 42, week52High: 12.50, week52Low: 6.20, avgVolume: 4200000, dividend: 2.0 },
+    { symbol: "KFEIN", name: "Kafein Yazılım", sector: "Teknoloji", price: 9.12, change: 4.56, volume: 8900000, marketCap: 450000000, pe: 18.5, pb: 3.2, roe: 17.3, debt: 15, beta: 1.7, float: 55, week52High: 14.80, week52Low: 6.50, avgVolume: 6500000, dividend: 0 },
+    { symbol: "KNFRT", name: "Konfrut Gıda", sector: "Gıda", price: 3.67, change: 8.55, volume: 16700000, marketCap: 175000000, pe: 6.2, pb: 0.9, roe: 14.5, debt: 28, beta: 1.3, float: 60, week52High: 5.80, week52Low: 2.30, avgVolume: 11000000, dividend: 2.8 },
+    { symbol: "KUYAS", name: "Kuyumcukent Gayrimenkul", sector: "İnşaat", price: 1.98, change: 12.50, volume: 28000000, marketCap: 98000000, pe: 4.5, pb: 0.5, roe: 11.1, debt: 55, beta: 2.1, float: 78, week52High: 3.50, week52Low: 1.10, avgVolume: 18000000, dividend: 0 },
+    { symbol: "LINK", name: "Link Bilgisayar", sector: "Teknoloji", price: 6.78, change: 3.89, volume: 9200000, marketCap: 380000000, pe: 12.3, pb: 2.0, roe: 16.3, debt: 20, beta: 1.5, float: 52, week52High: 10.20, week52Low: 4.80, avgVolume: 6800000, dividend: 1.5 },
+    { symbol: "MEGAP", name: "Mega Polietilen", sector: "Sanayi", price: 2.45, change: 5.60, volume: 13400000, marketCap: 110000000, pe: 5.8, pb: 0.7, roe: 12.1, debt: 42, beta: 1.6, float: 70, week52High: 4.20, week52Low: 1.60, avgVolume: 9000000, dividend: 1.0 },
+    { symbol: "PCILT", name: "PC İletişim", sector: "Teknoloji", price: 1.78, change: 11.25, volume: 25000000, marketCap: 92000000, pe: 5.2, pb: 0.8, roe: 15.4, debt: 30, beta: 2.3, float: 72, week52High: 3.20, week52Low: 1.00, avgVolume: 16000000, dividend: 0 },
+    { symbol: "PKART", name: "Plastikkart", sector: "Teknoloji", price: 3.34, change: 7.40, volume: 15600000, marketCap: 165000000, pe: 6.5, pb: 1.0, roe: 15.4, debt: 22, beta: 1.5, float: 60, week52High: 5.50, week52Low: 2.10, avgVolume: 10000000, dividend: 1.5 },
+    { symbol: "PRKME", name: "Park Elektrik Madencilik", sector: "Madencilik", price: 5.90, change: 4.24, volume: 11200000, marketCap: 380000000, pe: 6.8, pb: 1.2, roe: 17.6, debt: 30, beta: 1.4, float: 55, week52High: 9.20, week52Low: 4.00, avgVolume: 8000000, dividend: 2.5 },
+    { symbol: "PRZMA", name: "Prizma Pres", sector: "Sanayi", price: 2.56, change: 6.67, volume: 9800000, marketCap: 118000000, pe: 5.9, pb: 0.7, roe: 11.9, debt: 40, beta: 1.5, float: 68, week52High: 4.30, week52Low: 1.70, avgVolume: 7000000, dividend: 1.0 },
+    { symbol: "SAFKR", name: "Safkar Ege Elektrik", sector: "Enerji", price: 3.12, change: 5.41, volume: 10500000, marketCap: 155000000, pe: 6.5, pb: 0.8, roe: 12.3, debt: 42, beta: 1.5, float: 65, week52High: 5.20, week52Low: 2.10, avgVolume: 7500000, dividend: 2.0 },
+    { symbol: "SMART", name: "SmartIKS Teknoloji", sector: "Teknoloji", price: 8.90, change: 5.95, volume: 12300000, marketCap: 520000000, pe: 16.8, pb: 2.8, roe: 16.7, debt: 15, beta: 1.8, float: 55, week52High: 13.50, week52Low: 5.80, avgVolume: 8500000, dividend: 0 },
+    { symbol: "UFUK", name: "Ufuk Yatırım", sector: "Finans", price: 1.23, change: 15.89, volume: 42000000, marketCap: 72000000, pe: 3.8, pb: 0.4, roe: 10.5, debt: 48, beta: 2.5, float: 82, week52High: 2.50, week52Low: 0.72, avgVolume: 28000000, dividend: 0 },
+    { symbol: "FORTE", name: "Forte Bilgi İletişim", sector: "Teknoloji", price: 2.89, change: 9.47, volume: 21000000, marketCap: 135000000, pe: 5.5, pb: 0.9, roe: 16.4, debt: 22, beta: 1.9, float: 68, week52High: 5.00, week52Low: 1.60, avgVolume: 14000000, dividend: 0 },
+    { symbol: "EDATA", name: "E-Data Teknoloji", sector: "Teknoloji", price: 1.45, change: 13.28, volume: 35000000, marketCap: 78000000, pe: 4.5, pb: 0.6, roe: 13.3, debt: 32, beta: 2.4, float: 78, week52High: 2.80, week52Low: 0.80, avgVolume: 22000000, dividend: 0 },
+    { symbol: "VANGD", name: "Vanet Gıda", sector: "Gıda", price: 2.34, change: 9.35, volume: 20500000, marketCap: 115000000, pe: 5.5, pb: 0.7, roe: 12.7, debt: 40, beta: 1.7, float: 70, week52High: 4.00, week52Low: 1.50, avgVolume: 14000000, dividend: 1.0 },
+    { symbol: "SAMAT", name: "Saray Matbaacılık", sector: "Sanayi", price: 1.67, change: 8.44, volume: 19500000, marketCap: 78000000, pe: 4.8, pb: 0.5, roe: 10.4, debt: 50, beta: 2.0, float: 75, week52High: 3.20, week52Low: 1.05, avgVolume: 13000000, dividend: 0 },
+    { symbol: "FONET", name: "Fonet Bilgi Teknolojileri", sector: "Teknoloji", price: 6.34, change: 3.26, volume: 8900000, marketCap: 310000000, pe: 10.5, pb: 1.8, roe: 17.1, debt: 15, beta: 1.5, float: 52, week52High: 9.80, week52Low: 4.50, avgVolume: 6200000, dividend: 1.0 },
+    { symbol: "MAGEN", name: "MA Güneş Enerji", sector: "Enerji", price: 4.34, change: 6.37, volume: 13500000, marketCap: 220000000, pe: 8.0, pb: 1.2, roe: 15.0, debt: 30, beta: 1.5, float: 58, week52High: 7.00, week52Low: 3.00, avgVolume: 9500000, dividend: 1.5 },
+    { symbol: "KRVGD", name: "Kervan Gıda", sector: "Gıda", price: 5.89, change: 2.34, volume: 7800000, marketCap: 340000000, pe: 8.8, pb: 1.3, roe: 14.8, debt: 25, beta: 1.0, float: 48, week52High: 8.50, week52Low: 4.20, avgVolume: 5500000, dividend: 3.0 },
+    { symbol: "YAYLA", name: "Yayla Enerji", sector: "Enerji", price: 5.67, change: 4.41, volume: 9800000, marketCap: 320000000, pe: 7.8, pb: 1.2, roe: 15.4, debt: 32, beta: 1.3, float: 52, week52High: 8.80, week52Low: 4.00, avgVolume: 7000000, dividend: 2.8 },
+    { symbol: "OSTIM", name: "Ostim Endüstriyel", sector: "Sanayi", price: 5.67, change: 2.56, volume: 8900000, marketCap: 350000000, pe: 8.5, pb: 1.3, roe: 15.3, debt: 22, beta: 1.2, float: 50, week52High: 8.40, week52Low: 4.00, avgVolume: 6500000, dividend: 2.8 },
+];
+
+// Global fetcher instance
+const dataFetcher = new BISTDataFetcher();
