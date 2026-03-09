@@ -473,9 +473,64 @@ class App {
     }
 
     renderOverviewTab(stock, analysis) {
+        const layers = [
+            { key: 'technical', label: 'Teknik Analiz', icon: 'chart-line', color: 'blue', weight: analysis.layers.technical.weight },
+            { key: 'fundamental', label: 'Temel Analiz', icon: 'balance-scale', color: 'green', weight: analysis.layers.fundamental.weight },
+            { key: 'momentum', label: 'Momentum', icon: 'bolt', color: 'orange', weight: analysis.layers.momentum.weight },
+            { key: 'sentiment', label: 'Duyarlılık', icon: 'heart', color: 'purple', weight: analysis.layers.sentiment.weight },
+            { key: 'macroSector', label: 'Makro/Sektör', icon: 'globe', color: 'blue', weight: analysis.layers.macroSector.weight },
+            { key: 'riskReward', label: 'Risk/Ödül', icon: 'shield-alt', color: 'red', weight: analysis.layers.riskReward.weight },
+        ];
+
+        const layerHTML = layers.map(l => {
+            const s = analysis.layers[l.key].score;
+            const topSignals = (analysis.layers[l.key].signals || []).slice(0, 2);
+            return `
+                <div class="detail-item" style="position:relative">
+                    <span class="label"><i class="fas fa-${l.icon}" style="color:var(--accent-${l.color})"></i> ${l.label} <small style="opacity:0.6">(${Math.round(l.weight * 100)}%)</small></span>
+                    <span class="value" style="color:${this.getScoreColor(s)}">${s}</span>
+                    <div class="progress-indicator"><div class="fill fill-${l.color}" style="width:${s}%"></div></div>
+                    ${topSignals.length ? `<small style="color:var(--text-muted);display:block;margin-top:4px;line-height:1.4">${topSignals.join('<br>')}</small>` : ''}
+                </div>
+            `;
+        }).join('');
+
+        // Forecast summary
+        const f30 = analysis.forecast?.ensemble?.[30];
+        const forecastHTML = f30 ? `
+            <div style="margin-top:16px;padding:12px;background:var(--bg-secondary);border-radius:var(--radius-sm);border:1px solid var(--border-color)">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                    <div>
+                        <span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase">30 Günlük Tahmin</span>
+                        <div style="font-size:1.3rem;font-weight:700;color:${f30.changePct >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}">₺${f30.price} <small>(${f30.changePct > 0 ? '+' : ''}${f30.changePct}%)</small></div>
+                    </div>
+                    <div style="text-align:right">
+                        <span style="font-size:0.75rem;color:var(--text-muted)">Güven Aralığı</span>
+                        <div style="font-size:0.85rem">₺${f30.ciLow} — ₺${f30.ciHigh}</div>
+                    </div>
+                    <div style="text-align:right">
+                        <span style="font-size:0.75rem;color:var(--text-muted)">Model Güveni</span>
+                        <div style="font-size:0.85rem">${analysis.forecast.confidence} (R²: ${analysis.forecast.models?.linearRegression?.r2 || 'N/A'})</div>
+                    </div>
+                </div>
+            </div>
+        ` : '';
+
+        // Candlestick patterns
+        const candleHTML = (analysis.candles?.patterns?.length > 0) ? `
+            <div style="margin-top:12px">
+                <span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase">Mum Formasyonları</span>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+                    ${analysis.candles.patterns.map(p => `
+                        <span class="signal-badge ${p.type === 'bullish' ? 'signal-buy' : p.type === 'bearish' ? 'signal-sell' : 'signal-hold'}" title="${p.desc}">${p.name}</span>
+                    `).join('')}
+                </div>
+            </div>
+        ` : '';
+
         document.getElementById('overview-content').innerHTML = `
             <div class="overview-card">
-                <h4><i class="fas fa-bullseye"></i> AI Genel Skor</h4>
+                <h4><i class="fas fa-bullseye"></i> 6 Katmanlı AI Skor</h4>
                 <div class="gauge-container">
                     <div style="font-size:3.5rem;font-weight:800;color:${this.getScoreColor(analysis.totalScore)}">${analysis.totalScore}</div>
                     <div class="gauge-label">/100</div>
@@ -484,27 +539,10 @@ class App {
                     </div>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px">
-                    <div class="detail-item">
-                        <span class="label">Teknik</span>
-                        <span class="value" style="color:${this.getScoreColor(analysis.technical.score)}">${analysis.technical.score}</span>
-                        <div class="progress-indicator"><div class="fill fill-blue" style="width:${analysis.technical.score}%"></div></div>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">Temel</span>
-                        <span class="value" style="color:${this.getScoreColor(analysis.fundamental.score)}">${analysis.fundamental.score}</span>
-                        <div class="progress-indicator"><div class="fill fill-green" style="width:${analysis.fundamental.score}%"></div></div>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">Momentum</span>
-                        <span class="value" style="color:${this.getScoreColor(analysis.momentum.score)}">${analysis.momentum.score}</span>
-                        <div class="progress-indicator"><div class="fill fill-orange" style="width:${analysis.momentum.score}%"></div></div>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">Duyarlılık</span>
-                        <span class="value" style="color:${this.getScoreColor(analysis.sentiment.score)}">${analysis.sentiment.score}</span>
-                        <div class="progress-indicator"><div class="fill fill-purple" style="width:${analysis.sentiment.score}%"></div></div>
-                    </div>
+                    ${layerHTML}
                 </div>
+                ${forecastHTML}
+                ${candleHTML}
             </div>
             <div class="overview-card">
                 <h4><i class="fas fa-robot"></i> AI Yorum</h4>
@@ -517,72 +555,122 @@ class App {
 
     renderTechnicalTab(stock, analysis) {
         const ti = analysis.technical.indicators;
+        const sr = analysis.supportResistance || {};
+        const fib = sr.fibonacci || {};
+
+        // Top signals
+        const signalsHTML = (analysis.technical.signals || []).length > 0 ? `
+            <div style="margin-bottom:16px;padding:12px;background:var(--bg-secondary);border-radius:var(--radius-sm);border:1px solid var(--border-color)">
+                <span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase">AI Teknik Sinyaller</span>
+                ${analysis.technical.signals.map(s => `<div style="font-size:0.85rem;padding:4px 0;color:var(--text-primary)">• ${s}</div>`).join('')}
+            </div>
+        ` : '';
+
         document.getElementById('technical-content').innerHTML = `
+            ${signalsHTML}
+            <h4 style="margin-bottom:10px;font-size:0.85rem;color:var(--text-secondary)">MOMENTUM GÖSTERGELERİ</h4>
             <div class="detail-grid">
                 <div class="detail-item">
                     <span class="label">RSI (14)</span>
-                    <span class="value" style="color:${ti.rsi < 30 ? 'var(--accent-green)' : ti.rsi > 70 ? 'var(--accent-red)' : 'var(--accent-blue)'}">${ti.rsi.toFixed(1)}</span>
-                    <div class="progress-indicator"><div class="fill ${ti.rsi < 30 ? 'fill-green' : ti.rsi > 70 ? 'fill-red' : 'fill-blue'}" style="width:${ti.rsi}%"></div></div>
+                    <span class="value" style="color:${ti.rsi < 30 ? 'var(--accent-green)' : ti.rsi > 70 ? 'var(--accent-red)' : 'var(--accent-blue)'}">${ti.rsi?.toFixed(1) || 'N/A'}</span>
+                    <div class="progress-indicator"><div class="fill ${ti.rsi < 30 ? 'fill-green' : ti.rsi > 70 ? 'fill-red' : 'fill-blue'}" style="width:${ti.rsi || 50}%"></div></div>
                 </div>
                 <div class="detail-item">
-                    <span class="label">MACD Sinyal</span>
-                    <span class="value" style="color:${ti.macd.signal === 'bullish' ? 'var(--accent-green)' : 'var(--accent-red)'}">
-                        ${ti.macd.signal === 'bullish' ? '▲ Yükseliş' : '▼ Düşüş'}
+                    <span class="label">Stokastik %K / %D</span>
+                    <span class="value">${ti.stochastic?.k?.toFixed(1) || 0} / ${ti.stochastic?.d?.toFixed(1) || 0}</span>
+                    <div class="progress-indicator"><div class="fill fill-blue" style="width:${ti.stochastic?.k || 50}%"></div></div>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Williams %R</span>
+                    <span class="value" style="color:${ti.williamsR < -80 ? 'var(--accent-green)' : ti.williamsR > -20 ? 'var(--accent-red)' : 'var(--text-primary)'}">${ti.williamsR || 0}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">CCI</span>
+                    <span class="value" style="color:${ti.cci < -100 ? 'var(--accent-green)' : ti.cci > 100 ? 'var(--accent-red)' : 'var(--text-primary)'}">${ti.cci || 0}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">ROC (10)</span>
+                    <span class="value" style="color:${ti.roc > 0 ? 'var(--accent-green)' : 'var(--accent-red)'}">%${ti.roc || 0}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">MFI</span>
+                    <span class="value" style="color:${ti.mfi < 20 ? 'var(--accent-green)' : ti.mfi > 80 ? 'var(--accent-red)' : 'var(--accent-blue)'}">${ti.mfi || 50}</span>
+                    <div class="progress-indicator"><div class="fill fill-blue" style="width:${ti.mfi || 50}%"></div></div>
+                </div>
+            </div>
+
+            <h4 style="margin:16px 0 10px;font-size:0.85rem;color:var(--text-secondary)">TREND GÖSTERGELERİ</h4>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <span class="label">MACD</span>
+                    <span class="value" style="color:${ti.macd?.signal === 'bullish' ? 'var(--accent-green)' : 'var(--accent-red)'}">
+                        ${ti.macd?.signal === 'bullish' ? '▲ Yükseliş' : '▼ Düşüş'}
                     </span>
-                    <small style="color:var(--text-muted)">MACD: ${ti.macd.macdLine} | Signal: ${ti.macd.signalLine}</small>
+                    <small style="color:var(--text-muted)">Hist: ${ti.macd?.histogram || 0}</small>
                 </div>
                 <div class="detail-item">
-                    <span class="label">Stokastik %K</span>
-                    <span class="value">${ti.stochastic.k.toFixed(1)}</span>
-                    <div class="progress-indicator"><div class="fill fill-blue" style="width:${ti.stochastic.k}%"></div></div>
+                    <span class="label">SMA 20 / 50</span>
+                    <span class="value">₺${ti.ma?.sma20 || 0} / ₺${ti.ma?.sma50 || 0}</span>
+                    <small style="color:var(--text-muted)">${ti.ma?.goldenCross ? '⭐ Golden Cross' : ti.ma?.deathCross ? '☠️ Death Cross' : ti.ma?.aboveSMA20 ? '▲ Üzerinde' : '▼ Altında'}</small>
+                </div>
+                <div class="detail-item">
+                    <span class="label">ADX (Trend Gücü)</span>
+                    <span class="value" style="color:${ti.adx?.value > 25 ? 'var(--accent-green)' : 'var(--text-muted)'}">${ti.adx?.value?.toFixed(0) || 0}</span>
+                    <small style="color:var(--text-muted)">${ti.adx?.value > 25 ? 'Güçlü trend' : 'Zayıf trend'}</small>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Ichimoku Bulut</span>
+                    <span class="value">${ti.ichimoku?.aboveCloud ? '🟢 Üzerinde' : ti.ichimoku?.belowCloud ? '🔴 Altında' : '🟡 İçinde'}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Parabolic SAR</span>
+                    <span class="value" style="color:${ti.parabolicSAR?.trend === 'bullish' ? 'var(--accent-green)' : 'var(--accent-red)'}">
+                        ${ti.parabolicSAR?.trend === 'bullish' ? '▲ Yükseliş' : '▼ Düşüş'} (₺${ti.parabolicSAR?.value || 0})
+                    </span>
                 </div>
                 <div class="detail-item">
                     <span class="label">Hacim Oranı</span>
                     <span class="value" style="color:${ti.volumeRatio > 1.5 ? 'var(--accent-green)' : 'var(--text-primary)'}">
-                        ${ti.volumeRatio.toFixed(2)}x
+                        ${ti.volumeRatio?.toFixed(2) || 0}x
                     </span>
                 </div>
+            </div>
+
+            <h4 style="margin:16px 0 10px;font-size:0.85rem;color:var(--text-secondary)">VOLATİLİTE & HACİM</h4>
+            <div class="detail-grid">
                 <div class="detail-item">
-                    <span class="label">MA20</span>
-                    <span class="value">₺${ti.ma.ma20} ${ti.ma.aboveMA20 ? '<span style="color:var(--accent-green)">▲</span>' : '<span style="color:var(--accent-red)">▼</span>'}</span>
+                    <span class="label">Bollinger Bantları</span>
+                    <span class="value">${ti.bollingerBands?.position === 'lower' ? '🟢 Alt Bant' : ti.bollingerBands?.position === 'upper' ? '🔴 Üst Bant' : '🟡 Orta'}</span>
+                    <small style="color:var(--text-muted)">₺${ti.bollingerBands?.lower || 0} — ₺${ti.bollingerBands?.upper || 0} ${ti.bollingerBands?.squeeze ? '⚡ SQUEEZE' : ''}</small>
                 </div>
                 <div class="detail-item">
-                    <span class="label">MA50</span>
-                    <span class="value">₺${ti.ma.ma50} ${ti.ma.aboveMA50 ? '<span style="color:var(--accent-green)">▲</span>' : '<span style="color:var(--accent-red)">▼</span>'}</span>
+                    <span class="label">ATR (14)</span>
+                    <span class="value">₺${ti.atr?.value || 0} <small>(%${ti.atr?.percent || 0})</small></span>
                 </div>
                 <div class="detail-item">
-                    <span class="label">Bollinger Alt</span>
-                    <span class="value">₺${ti.bollingerBands.lower}</span>
+                    <span class="label">OBV Trend</span>
+                    <span class="value" style="color:${ti.obv?.trend === 'rising' ? 'var(--accent-green)' : 'var(--accent-red)'}">${ti.obv?.trend === 'rising' ? '▲ Yükseliyor' : '▼ Düşüyor'}</span>
                 </div>
                 <div class="detail-item">
-                    <span class="label">Bollinger Üst</span>
-                    <span class="value">₺${ti.bollingerBands.upper}</span>
-                </div>
-                <div class="detail-item">
-                    <span class="label">Destek</span>
-                    <span class="value" style="color:var(--accent-green)">₺${ti.support}</span>
-                </div>
-                <div class="detail-item">
-                    <span class="label">Direnç</span>
-                    <span class="value" style="color:var(--accent-red)">₺${ti.resistance}</span>
-                </div>
-                <div class="detail-item">
-                    <span class="label">ATR</span>
-                    <span class="value">₺${ti.atr.value} (%${ti.atr.percent})</span>
-                </div>
-                <div class="detail-item">
-                    <span class="label">BB Pozisyon</span>
-                    <span class="value">${ti.bollingerBands.position === 'lower' ? '🟢 Alt Bant' : ti.bollingerBands.position === 'upper' ? '🔴 Üst Bant' : '🟡 Orta'}</span>
+                    <span class="label">CMF (Para Akışı)</span>
+                    <span class="value" style="color:${ti.cmf > 0.05 ? 'var(--accent-green)' : ti.cmf < -0.05 ? 'var(--accent-red)' : 'var(--text-primary)'}">${ti.cmf || 0}</span>
                 </div>
             </div>
-            <div style="margin-top:16px">
-                <h4 style="margin-bottom:12px;font-size:0.9rem"><i class="fas fa-wave-square" style="color:var(--accent-purple)"></i> Fibonacci Seviyeleri</h4>
-                <div class="detail-grid">
-                    <div class="detail-item"><span class="label">%23.6</span><span class="value">₺${ti.fibonacci.level236}</span></div>
-                    <div class="detail-item"><span class="label">%38.2</span><span class="value">₺${ti.fibonacci.level382}</span></div>
-                    <div class="detail-item"><span class="label">%50.0</span><span class="value">₺${ti.fibonacci.level500}</span></div>
-                    <div class="detail-item"><span class="label">%61.8</span><span class="value">₺${ti.fibonacci.level618}</span></div>
+
+            <h4 style="margin:16px 0 10px;font-size:0.85rem;color:var(--text-secondary)">DESTEK / DİRENÇ & FİBONACCİ</h4>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <span class="label">En Yakın Destek</span>
+                    <span class="value" style="color:var(--accent-green)">₺${sr.nearestSupport || 0}</span>
                 </div>
+                <div class="detail-item">
+                    <span class="label">En Yakın Direnç</span>
+                    <span class="value" style="color:var(--accent-red)">₺${sr.nearestResistance || 0}</span>
+                </div>
+                <div class="detail-item"><span class="label">Pivot (P)</span><span class="value">₺${sr.pivots?.P || 0}</span></div>
+                <div class="detail-item"><span class="label">R1 / R2</span><span class="value">₺${sr.pivots?.R1 || 0} / ₺${sr.pivots?.R2 || 0}</span></div>
+                <div class="detail-item"><span class="label">S1 / S2</span><span class="value">₺${sr.pivots?.S1 || 0} / ₺${sr.pivots?.S2 || 0}</span></div>
+                <div class="detail-item"><span class="label">Fib %38.2 / %61.8</span><span class="value">₺${fib.level382 || 0} / ₺${fib.level618 || 0}</span></div>
             </div>
         `;
     }
@@ -650,12 +738,12 @@ class App {
                     <span class="value" style="color:${sf.countryRisk === 'Düşük' ? 'var(--accent-green)' : sf.countryRisk === 'Yüksek' ? 'var(--accent-red)' : 'var(--accent-orange)'}">${sf.countryRisk}</span>
                 </div>
                 <div class="detail-item">
-                    <span class="label">Enflasyon Etkisi</span>
-                    <span class="value">${sf.inflationImpact}</span>
+                    <span class="label">VIX</span>
+                    <span class="value" style="color:${(sf.vix || 18) > 25 ? 'var(--accent-red)' : 'var(--accent-green)'}">${sf.vix || 'N/A'}</span>
                 </div>
                 <div class="detail-item">
-                    <span class="label">Faiz Etkisi</span>
-                    <span class="value">${sf.interestRateImpact}</span>
+                    <span class="label">Genel Duyarlılık Skoru</span>
+                    <span class="value">${analysis.sentiment.score}/100</span>
                 </div>
                 <div class="detail-item">
                     <span class="label">Kurumsal İlgi</span>
@@ -680,50 +768,106 @@ class App {
     }
 
     renderRiskTab(stock, analysis) {
-        const rf = analysis.risk.factors;
+        const rm = analysis.risk.riskMetrics;
+        const riskSignals = analysis.risk.signals || [];
+
         document.getElementById('risk-content').innerHTML = `
             <div style="text-align:center;margin-bottom:20px">
                 <div style="font-size:1rem;color:var(--text-secondary);margin-bottom:4px">Genel Risk Seviyesi</div>
-                <div style="font-size:3rem;font-weight:800;color:${analysis.risk.score > 60 ? 'var(--accent-red)' : analysis.risk.score > 40 ? 'var(--accent-orange)' : 'var(--accent-green)'}">
-                    ${rf.overallRisk}
+                <div style="font-size:3rem;font-weight:800;color:${rm.riskScore > 60 ? 'var(--accent-red)' : rm.riskScore > 40 ? 'var(--accent-orange)' : 'var(--accent-green)'}">
+                    ${rm.overallRisk}
                 </div>
-                <div style="font-size:1.5rem;color:var(--text-muted)">${analysis.risk.score}/100</div>
+                <div style="font-size:1.5rem;color:var(--text-muted)">Risk Skoru: ${rm.riskScore}/100</div>
             </div>
+
+            ${riskSignals.length > 0 ? `
+                <div style="margin-bottom:16px;padding:12px;background:var(--bg-secondary);border-radius:var(--radius-sm);border:1px solid var(--border-color)">
+                    ${riskSignals.map(s => `<div style="font-size:0.85rem;padding:3px 0;color:var(--accent-orange)">⚠ ${s}</div>`).join('')}
+                </div>
+            ` : ''}
+
+            <h4 style="margin-bottom:10px;font-size:0.85rem;color:var(--text-secondary)">PİYASA RİSKİ</h4>
             <div class="detail-grid">
                 <div class="detail-item">
                     <span class="label">Beta</span>
-                    <span class="value">${rf.beta}</span>
-                    <div class="progress-indicator"><div class="fill ${rf.beta > 1.5 ? 'fill-red' : rf.beta > 1 ? 'fill-orange' : 'fill-green'}" style="width:${rf.beta * 40}%"></div></div>
+                    <span class="value">${rm.beta}</span>
+                    <div class="progress-indicator"><div class="fill ${rm.beta > 1.5 ? 'fill-red' : rm.beta > 1 ? 'fill-orange' : 'fill-green'}" style="width:${Math.min(100, rm.beta * 40)}%"></div></div>
                 </div>
                 <div class="detail-item">
-                    <span class="label">Borç Riski</span>
-                    <span class="value" style="color:${rf.debtRisk === 'Yüksek' ? 'var(--accent-red)' : rf.debtRisk === 'Orta' ? 'var(--accent-orange)' : 'var(--accent-green)'}">${rf.debtRisk}</span>
+                    <span class="label">Yıllık Volatilite</span>
+                    <span class="value">%${rm.annualVolatility}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">52H Volatilite</span>
+                    <span class="value" style="color:${rm.volatility > 100 ? 'var(--accent-red)' : 'var(--text-primary)'}">%${rm.volatility}</span>
+                    <div class="progress-indicator"><div class="fill ${rm.volatility > 100 ? 'fill-red' : rm.volatility > 60 ? 'fill-orange' : 'fill-green'}" style="width:${Math.min(100, rm.volatility)}%"></div></div>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Maks. Düşüş Pot.</span>
+                    <span class="value" style="color:var(--accent-red)">%${rm.maxDrawdown}</span>
+                    <div class="progress-indicator"><div class="fill fill-red" style="width:${rm.maxDrawdown}%"></div></div>
+                </div>
+            </div>
+
+            <h4 style="margin:16px 0 10px;font-size:0.85rem;color:var(--text-secondary)">VaR & CVaR (Riske Maruz Değer)</h4>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <span class="label">VaR %95 (Günlük)</span>
+                    <span class="value" style="color:var(--accent-red)">₺${rm.var95Daily}</span>
+                    <small style="color:var(--text-muted)">Günlük max kayıp (%95 güven)</small>
+                </div>
+                <div class="detail-item">
+                    <span class="label">VaR %99 (Günlük)</span>
+                    <span class="value" style="color:var(--accent-red)">₺${rm.var99Daily}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">CVaR %95 (Beklenen Kayıp)</span>
+                    <span class="value" style="color:var(--accent-red)">₺${rm.cvar95Daily}</span>
+                    <small style="color:var(--text-muted)">VaR aşıldığında ort. kayıp</small>
+                </div>
+                <div class="detail-item">
+                    <span class="label">VaR %95 (Aylık)</span>
+                    <span class="value" style="color:var(--accent-red)">₺${rm.var95Monthly}</span>
+                </div>
+            </div>
+
+            <h4 style="margin:16px 0 10px;font-size:0.85rem;color:var(--text-secondary)">STOP LOSS SEVİYELERİ (ATR Bazlı)</h4>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <span class="label">ATR (14)</span>
+                    <span class="value">₺${rm.atr}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Stop Loss 1.5x ATR</span>
+                    <span class="value" style="color:var(--accent-orange)">₺${rm.stopLoss_1_5x}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Stop Loss 2x ATR</span>
+                    <span class="value" style="color:var(--accent-red)">₺${rm.stopLoss_2x}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Stop Loss 3x ATR</span>
+                    <span class="value" style="color:var(--accent-red)">₺${rm.stopLoss_3x}</span>
+                </div>
+            </div>
+
+            <h4 style="margin:16px 0 10px;font-size:0.85rem;color:var(--text-secondary)">RİSK / ÖDÜL</h4>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <span class="label">Yükseliş Potansiyeli</span>
+                    <span class="value" style="color:var(--accent-green)">%${rm.upside}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Düşüş Riski</span>
+                    <span class="value" style="color:var(--accent-red)">%${rm.downside}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">R/R Oranı</span>
+                    <span class="value" style="color:${rm.riskRewardRatio > 1.5 ? 'var(--accent-green)' : 'var(--accent-red)'}">${rm.riskRewardRatio}x</span>
                 </div>
                 <div class="detail-item">
                     <span class="label">Likidite Riski</span>
-                    <span class="value" style="color:${rf.liquidityRisk === 'Yüksek' ? 'var(--accent-red)' : rf.liquidityRisk === 'Orta' ? 'var(--accent-orange)' : 'var(--accent-green)'}">${rf.liquidityRisk}</span>
-                </div>
-                <div class="detail-item">
-                    <span class="label">Volatilite</span>
-                    <span class="value">%${rf.volatility}</span>
-                    <div class="progress-indicator"><div class="fill ${rf.volatility > 100 ? 'fill-red' : rf.volatility > 60 ? 'fill-orange' : 'fill-green'}" style="width:${Math.min(100, rf.volatility)}%"></div></div>
-                </div>
-                <div class="detail-item">
-                    <span class="label">Float Riski</span>
-                    <span class="value">${rf.floatRisk}</span>
-                </div>
-                <div class="detail-item">
-                    <span class="label">Kazanç Riski</span>
-                    <span class="value" style="color:${rf.earningsRisk === 'Çok Yüksek' || rf.earningsRisk === 'Yüksek' ? 'var(--accent-red)' : rf.earningsRisk === 'Orta' ? 'var(--accent-orange)' : 'var(--accent-green)'}">${rf.earningsRisk}</span>
-                </div>
-                <div class="detail-item">
-                    <span class="label">Büyüklük Riski</span>
-                    <span class="value">${rf.sizeRisk}</span>
-                </div>
-                <div class="detail-item">
-                    <span class="label">Maks. Düşüş Potansiyeli</span>
-                    <span class="value" style="color:var(--accent-red)">%${rf.maxDrawdown}</span>
-                    <div class="progress-indicator"><div class="fill fill-red" style="width:${rf.maxDrawdown}%"></div></div>
+                    <span class="value" style="color:${rm.liquidityRisk === 'Yüksek' ? 'var(--accent-red)' : rm.liquidityRisk === 'Orta' ? 'var(--accent-orange)' : 'var(--accent-green)'}">${rm.liquidityRisk}</span>
                 </div>
             </div>
         `;
